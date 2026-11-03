@@ -303,3 +303,18 @@ Google Calendar có trạng thái kết nối/đồng bộ và thông báo lỗi
 Các trang có loading, error, empty state và responsive cơ bản.
 
 Lưu ý tích hợp: Tên endpoint trong tài liệu là gợi ý để thống nhất hợp đồng API, không phải yêu cầu cố định. Frontend và Backend cần chốt request/response, enum trạng thái và quy tắc phân quyền trước khi tích hợp.
+
+├── client/                         
+│   ├── public/
+│   └── src/
+│       ├── assets/
+│       ├── components/
+│       ├── pages/
+│       ├── features/
+│       ├── services/
+│       ├── hooks/
+│       ├── contexts/
+│       ├── routes/
+│       ├── utils/
+│       ├── App.jsx
+│       └── main.jsx

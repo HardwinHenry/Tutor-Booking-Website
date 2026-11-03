@@ -379,3 +379,21 @@ Google Calendar lỗi hoặc người dùng chưa kết nối không làm rollba
 | Mở rộng | Review, dashboard Admin nâng cao, analytics, notification nâng cao | Cải thiện vận hành sau khi luồng chính ổn định. |
 
 Lưu ý triển khai: Chốt trước API contract, quy tắc slot bị chiếm ở trạng thái pending/confirmed, timezone và state machine booking. Đây là các điểm dễ gây lệch giữa Frontend và Backend nhất.
+
+
+├── server/                         # Node.js + Express
+│   ├── src/
+│   │   ├── config/
+│   │   ├── models/
+│   │   ├── routes/
+│   │   ├── controllers/
+│   │   ├── services/
+│   │   ├── middlewares/
+│   │   ├── validators/
+│   │   ├── utils/
+│   │   ├── integrations/
+│   │   │   └── google-calendar/
+│   │   ├── constants/
+│   │   ├── app.js
+│   │   └── server.js
+│   └── tests/
