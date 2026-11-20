@@ -28,4 +28,3 @@ describe('Error Handling Middleware', () => {
     expect(res.body.message).toMatch(/Malformed JSON/);
   });
 });
-

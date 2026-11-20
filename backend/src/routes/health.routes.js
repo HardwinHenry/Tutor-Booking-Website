@@ -6,4 +6,3 @@ const router = express.Router();
 router.get('/', getHealthStatus);
 
 module.exports = router;
-
