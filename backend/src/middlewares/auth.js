@@ -38,6 +38,10 @@ const authenticate = async (req, res, next) => {
       throw ApiError.forbidden('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên');
     }
 
+    if (user.status === USER_STATUS.DISABLED) {
+      throw ApiError.forbidden('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên');
+    }
+
     req.user = user;
     next();
   } catch (error) {

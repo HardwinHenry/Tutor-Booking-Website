@@ -25,10 +25,11 @@ router.post('/register', authLimiter, validateRegister, authController.register)
 router.post('/login', authLimiter, validateLogin, authController.login);
 
 /**
- * @route   POST /api/auth/refresh-token
+ * @route   POST /api/auth/refresh (and alias /refresh-token)
  * @desc    Get new access token using refresh token
  * @access  Public
  */
+router.post('/refresh', validateRefreshToken, authController.refreshToken);
 router.post('/refresh-token', validateRefreshToken, authController.refreshToken);
 
 /**

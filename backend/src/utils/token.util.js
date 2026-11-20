@@ -28,6 +28,7 @@ const generateRefreshToken = (user) => {
   const payload = {
     id: user._id ? user._id.toString() : user.id,
     type: 'refresh',
+    jti: crypto.randomUUID(),
   };
 
   return jwt.sign(payload, config.jwt.refreshSecret, {
