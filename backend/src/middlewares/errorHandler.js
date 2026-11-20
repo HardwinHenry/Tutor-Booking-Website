@@ -29,6 +29,15 @@ const errorHandler = (err, req, res, _next) => {
     error = ApiError.conflict(message);
   }
 
+  // Handle JWT Errors
+  if (err.name === 'JsonWebTokenError') {
+    error = ApiError.unauthorized('Token xác thực không hợp lệ');
+  }
+
+  if (err.name === 'TokenExpiredError') {
+    error = ApiError.unauthorized('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại');
+  }
+
   // Handle malformed JSON request body
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     error = ApiError.badRequest('Malformed JSON in request body');
@@ -57,4 +66,3 @@ const errorHandler = (err, req, res, _next) => {
 };
 
 module.exports = errorHandler;
-

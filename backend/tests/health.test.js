@@ -31,4 +31,3 @@ describe('Health Check Endpoints', () => {
     expect(res.body.endpoints).toHaveProperty('health', '/api/health');
   });
 });
-

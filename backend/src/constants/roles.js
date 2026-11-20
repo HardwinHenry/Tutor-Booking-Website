@@ -10,4 +10,3 @@ module.exports = {
   ROLES,
   ALL_ROLES,
 };
-

@@ -11,4 +11,3 @@ const requestLogger = morgan(config.env === 'production' ? prodFormat : devForma
 });
 
 module.exports = requestLogger;
-
