@@ -39,7 +39,9 @@ const authenticate = async (req, res, next) => {
     }
 
     if (user.status === USER_STATUS.DISABLED) {
-      throw ApiError.forbidden('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên');
+      throw ApiError.forbidden(
+        'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên'
+      );
     }
 
     req.user = user;
@@ -75,4 +77,3 @@ module.exports = {
   authenticate,
   authorize,
 };
-

@@ -10,5 +10,3 @@ module.exports = {
   USER_STATUS,
   ALL_USER_STATUSES,
 };
-
-

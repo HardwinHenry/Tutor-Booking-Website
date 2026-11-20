@@ -46,7 +46,10 @@ const config = {
 // Validate mandatory environment variables in production
 if (env === 'production') {
   const missingSecrets = [];
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'default_jwt_secret_do_not_use_in_prod') {
+  if (
+    !process.env.JWT_SECRET ||
+    process.env.JWT_SECRET === 'default_jwt_secret_do_not_use_in_prod'
+  ) {
     missingSecrets.push('JWT_SECRET');
   }
   if (!process.env.MONGODB_URI) {
