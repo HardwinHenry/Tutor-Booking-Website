@@ -66,6 +66,10 @@ const login = async ({ email, password }) => {
     throw ApiError.forbidden('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên');
   }
 
+  if (user.status === USER_STATUS.DISABLED) {
+    throw ApiError.forbidden('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên');
+  }
+
   const accessToken = generateAccessToken(user);
   const refreshToken = generateRefreshToken(user);
 
@@ -104,6 +108,10 @@ const refreshToken = async (rawRefreshToken) => {
 
   if (user.status === USER_STATUS.LOCKED) {
     throw ApiError.forbidden('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên');
+  }
+
+  if (user.status === USER_STATUS.DISABLED) {
+    throw ApiError.forbidden('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên');
   }
 
   const incomingHash = hashToken(rawRefreshToken);
@@ -146,6 +154,10 @@ const getCurrentUser = async (userId) => {
 
   if (user.status === USER_STATUS.LOCKED) {
     throw ApiError.forbidden('Tài khoản của bạn đã bị khóa');
+  }
+
+  if (user.status === USER_STATUS.DISABLED) {
+    throw ApiError.forbidden('Tài khoản của bạn đã bị vô hiệu hóa');
   }
 
   return user;

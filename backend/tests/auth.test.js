@@ -223,12 +223,49 @@ describe('Authentication & Authorization Module (Phase 2)', () => {
 
       await User.findByIdAndDelete(lockedUser._id);
     });
+
+    it('should reject login when account is disabled with 403 Forbidden', async () => {
+      // Create a disabled user
+      const disabledUser = await User.create({
+        name: 'Disabled User',
+        email: 'disabled@test-phase2.com',
+        passwordHash: await User.hashPassword('Password123'),
+        role: ROLES.LEARNER,
+        status: USER_STATUS.DISABLED,
+      });
+
+      const res = await request(app).post('/api/auth/login').send({
+        email: 'disabled@test-phase2.com',
+        password: 'Password123',
+      });
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('bị vô hiệu hóa');
+
+      await User.findByIdAndDelete(disabledUser._id);
+    });
   });
 
   // ----------------------------------------------------
   // 3. REFRESH TOKEN TESTS
   // ----------------------------------------------------
-  describe('POST /api/auth/refresh-token', () => {
+  describe('POST /api/auth/refresh-token & /api/auth/refresh', () => {
+    it('should issue new access and refresh token using /api/auth/refresh', async () => {
+      const res = await request(app)
+        .post('/api/auth/refresh')
+        .send({ refreshToken: learnerRefreshToken });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('accessToken');
+      expect(res.body.data).toHaveProperty('refreshToken');
+
+      // Update test variables with rotated refresh token
+      learnerAccessToken = res.body.data.accessToken;
+      learnerRefreshToken = res.body.data.refreshToken;
+    });
+
     it('should issue new access and refresh token when given valid refresh token', async () => {
       const res = await request(app)
         .post('/api/auth/refresh-token')
