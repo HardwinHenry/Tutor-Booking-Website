@@ -307,6 +307,14 @@ const tutorProfileSchema = new mongoose.Schema(
   }
 );
 
+// Compound and auxiliary indexes for search, filtering, and admin workflows
+tutorProfileSchema.index({ approvalStatus: 1, completionStatus: 1 });
+tutorProfileSchema.index({ 'expertise.categoryId': 1, approvalStatus: 1 });
+tutorProfileSchema.index({ 'expertise.subjectIds': 1, approvalStatus: 1 });
+tutorProfileSchema.index({ 'teachingConditions.priceMin': 1, 'teachingConditions.priceMax': 1 });
+tutorProfileSchema.index({ 'ratingSummary.averageRating': -1 });
+tutorProfileSchema.index({ submittedAt: -1 });
+
 const TutorProfile = mongoose.model('TutorProfile', tutorProfileSchema);
 
 module.exports = TutorProfile;
