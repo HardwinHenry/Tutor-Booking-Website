@@ -52,6 +52,36 @@ const authenticate = async (req, res, next) => {
 };
 
 /**
+ * Optional Authentication: Populates req.user if valid token exists, but doesn't block unauthenticated requests
+ */
+const optionalAuthenticate = async (req, res, next) => {
+  try {
+    let token = null;
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+
+    if (token) {
+      try {
+        const decoded = verifyAccessToken(token);
+        const user = await User.findById(decoded.id);
+        if (user && user.status === USER_STATUS.ACTIVE) {
+          req.user = user;
+        }
+      } catch {
+        // Silently ignore token errors for optional authentication
+      }
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Authorization Middleware: Enforces Role-Based Access Control (RBAC)
  * @param  {...string} roles Allowed roles for accessing the endpoint
  */
@@ -75,5 +105,6 @@ const authorize = (...roles) => {
 
 module.exports = {
   authenticate,
+  optionalAuthenticate,
   authorize,
 };

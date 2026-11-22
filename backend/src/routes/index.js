@@ -5,6 +5,8 @@ const taxonomyRoutes = require('./taxonomy.routes');
 const tagRoutes = require('./tag.routes');
 const questionnaireRoutes = require('./questionnaire.routes');
 const adminRoutes = require('./admin.routes');
+const learnerRoutes = require('./learner.routes');
+const tutorRoutes = require('./tutor.routes');
 
 const router = express.Router();
 
@@ -15,6 +17,8 @@ router.use('/questionnaires', questionnaireRoutes);
 router.use('/taxonomies', taxonomyRoutes);
 router.use('/tags', tagRoutes);
 router.use('/admin', adminRoutes);
+router.use('/learners', learnerRoutes);
+router.use('/tutors', tutorRoutes);
 
 // Root API Information
 router.get('/', (req, res) => {
@@ -40,6 +44,17 @@ router.get('/', (req, res) => {
         detail: 'GET /api/taxonomies/:id',
         children: 'GET /api/taxonomies/:id/children',
         tags: 'GET /api/tags',
+      },
+      learners: {
+        myPreference: 'GET /api/learners/preferences/me',
+        updatePreference: 'PUT|PATCH /api/learners/preferences/me',
+        completePreference: 'POST /api/learners/preferences/complete',
+      },
+      tutors: {
+        myProfile: 'GET /api/tutors/profile/me',
+        updateProfile: 'PUT|PATCH /api/tutors/profile/me',
+        submitProfile: 'POST /api/tutors/profile/submit',
+        publicProfile: 'GET /api/tutors/:id',
       },
       admin: {
         createTaxonomy: 'POST /api/admin/taxonomies',
