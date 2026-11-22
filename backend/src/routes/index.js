@@ -7,6 +7,7 @@ const questionnaireRoutes = require('./questionnaire.routes');
 const adminRoutes = require('./admin.routes');
 const learnerRoutes = require('./learner.routes');
 const tutorRoutes = require('./tutor.routes');
+const recommendationRoutes = require('./recommendation.routes');
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ router.use('/tags', tagRoutes);
 router.use('/admin', adminRoutes);
 router.use('/learners', learnerRoutes);
 router.use('/tutors', tutorRoutes);
+router.use('/recommendations', recommendationRoutes);
 
 // Root API Information
 router.get('/', (req, res) => {
@@ -56,6 +58,9 @@ router.get('/', (req, res) => {
         updateProfile: 'PUT|PATCH /api/tutors/profile/me',
         submitProfile: 'POST /api/tutors/profile/submit',
         publicProfile: 'GET /api/tutors/:id',
+      },
+      recommendations: {
+        tutors: 'POST|GET /api/recommendations/tutors',
       },
       admin: {
         createTaxonomy: 'POST /api/admin/taxonomies',
