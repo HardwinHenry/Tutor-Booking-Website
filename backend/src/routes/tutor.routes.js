@@ -5,6 +5,8 @@ const tutorProfileController = require('../controllers/tutorProfile.controller')
 const {
   validateUpdateTutorProfile,
   validateSubmitTutorProfile,
+  validateSearchTutors,
+  validateTutorIdParam,
 } = require('../validators/tutorProfile.validator');
 
 const router = express.Router();
@@ -41,7 +43,15 @@ router.post(
   tutorProfileController.submitMyProfile
 );
 
-// 2. Public Tutor Profile View (Optional auth for admin checks)
-router.get('/:id', optionalAuthenticate, tutorProfileController.getPublicProfile);
+// 2. Public Tutor Search (Phase 5)
+router.get('/', optionalAuthenticate, validateSearchTutors, tutorProfileController.searchTutors);
+
+// 3. Public Tutor Profile View (Optional auth for admin checks)
+router.get(
+  '/:id',
+  optionalAuthenticate,
+  validateTutorIdParam,
+  tutorProfileController.getPublicProfile
+);
 
 module.exports = router;

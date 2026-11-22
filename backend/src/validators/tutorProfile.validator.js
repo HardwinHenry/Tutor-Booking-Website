@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const ApiError = require('../utils/apiError');
 const Taxonomy = require('../models/taxonomy.model');
 const { TAXONOMY_TYPES } = require('../constants/taxonomyTypes');
-const { TUTOR_PRICE_RANGES, ENUMS } = require('../constants/profileStatus');
+const { APPROVAL_STATUS, TUTOR_PRICE_RANGES, ENUMS } = require('../constants/profileStatus');
 
 const isValidObjectId = (id) => id && mongoose.Types.ObjectId.isValid(id);
 
@@ -747,9 +747,336 @@ const validateSubmitTutorProfile = async (req, res, next) => {
   }
 };
 
+/**
+ * Whitelist definitions for Tutor Search API (Phase 5)
+ */
+const ALLOWED_SEARCH_QUERY_KEYS = new Set([
+  'category',
+  'subject',
+  'topic',
+  'mode',
+  'level',
+  'targetLevel',
+  'priceMin',
+  'priceMax',
+  'priceRangeId',
+  'area',
+  'experienceYearsMin',
+  'ratingMin',
+  'q',
+  'search',
+  'sort',
+  'page',
+  'limit',
+  'approvalStatus',
+]);
+
+const ALLOWED_SORT_VALUES = new Set([
+  'rating:desc',
+  '-rating',
+  'rating',
+  'rating:asc',
+  'price:asc',
+  'price',
+  'price:desc',
+  '-price',
+  'experience:desc',
+  '-experience',
+  'newest',
+  '-createdAt',
+  'oldest',
+  'createdAt',
+]);
+
+/**
+ * Helper to split and validate comma-separated or array IDs
+ */
+const parseAndValidateIdList = (input, fieldName, errors) => {
+  if (!input) return [];
+  const list = Array.isArray(input)
+    ? input
+    : typeof input === 'string' && input.includes(',')
+      ? input.split(',').map((s) => s.trim())
+      : [input];
+
+  for (const id of list) {
+    if (!isValidObjectId(id)) {
+      errors.push({
+        field: fieldName,
+        message: `${fieldName} chứa ID không hợp lệ: ${id}`,
+      });
+    }
+  }
+  return list;
+};
+
+/**
+ * Middleware: Validate Tutor Search Query Parameters (Phase 5)
+ */
+const validateSearchTutors = (req, res, next) => {
+  const errors = [];
+  const query = req.query || {};
+
+  // Check for unknown / unwhitelisted query keys
+  for (const key of Object.keys(query)) {
+    if (!ALLOWED_SEARCH_QUERY_KEYS.has(key)) {
+      errors.push({
+        field: key,
+        message: `Tham số truy vấn "${key}" không nằm trong danh sách cho phép (whitelist)`,
+      });
+    }
+  }
+
+  // Validate ObjectId fields
+  if (query.category) {
+    if (!isValidObjectId(query.category)) {
+      errors.push({
+        field: 'category',
+        message: 'Category ID phải là ObjectId hợp lệ',
+      });
+    }
+  }
+
+  if (query.subject) {
+    parseAndValidateIdList(query.subject, 'subject', errors);
+  }
+
+  if (query.topic) {
+    parseAndValidateIdList(query.topic, 'topic', errors);
+  }
+
+  if (query.mode) {
+    parseAndValidateIdList(query.mode, 'mode', errors);
+  }
+
+  if (query.level) {
+    parseAndValidateIdList(query.level, 'level', errors);
+  }
+
+  if (query.targetLevel) {
+    parseAndValidateIdList(query.targetLevel, 'targetLevel', errors);
+  }
+
+  // Validate price range and numbers
+  if (query.priceMin !== undefined && query.priceMin !== '') {
+    const num = Number(query.priceMin);
+    if (isNaN(num) || num < 0) {
+      errors.push({
+        field: 'priceMin',
+        message: 'priceMin phải là số không âm',
+      });
+    }
+  }
+
+  if (query.priceMax !== undefined && query.priceMax !== '') {
+    const num = Number(query.priceMax);
+    if (isNaN(num) || num < 0) {
+      errors.push({
+        field: 'priceMax',
+        message: 'priceMax phải là số không âm',
+      });
+    }
+  }
+
+  if (
+    query.priceMin !== undefined &&
+    query.priceMin !== '' &&
+    query.priceMax !== undefined &&
+    query.priceMax !== ''
+  ) {
+    if (Number(query.priceMin) > Number(query.priceMax)) {
+      errors.push({
+        field: 'priceMin',
+        message: 'priceMin không được lớn hơn priceMax',
+      });
+    }
+  }
+
+  if (query.priceRangeId) {
+    if (!TUTOR_PRICE_RANGES[query.priceRangeId]) {
+      errors.push({
+        field: 'priceRangeId',
+        message: `priceRangeId không hợp lệ. Các giá trị hợp lệ: ${Object.keys(TUTOR_PRICE_RANGES).join(', ')}`,
+      });
+    }
+  }
+
+  if (query.ratingMin !== undefined && query.ratingMin !== '') {
+    const num = Number(query.ratingMin);
+    if (isNaN(num) || num < 0 || num > 5) {
+      errors.push({
+        field: 'ratingMin',
+        message: 'ratingMin phải là số từ 0 đến 5',
+      });
+    }
+  }
+
+  if (query.experienceYearsMin !== undefined && query.experienceYearsMin !== '') {
+    const num = Number(query.experienceYearsMin);
+    if (isNaN(num) || num < 0) {
+      errors.push({
+        field: 'experienceYearsMin',
+        message: 'experienceYearsMin phải là số không âm',
+      });
+    }
+  }
+
+  // Validate sort
+  if (query.sort && !ALLOWED_SORT_VALUES.has(query.sort)) {
+    errors.push({
+      field: 'sort',
+      message: `Tùy chọn sắp xếp "${query.sort}" không hợp lệ`,
+    });
+  }
+
+  // Validate pagination
+  if (query.page !== undefined && (!/^\d+$/.test(query.page) || parseInt(query.page, 10) < 1)) {
+    errors.push({
+      field: 'page',
+      message: 'page phải là số nguyên dương >= 1',
+    });
+  }
+
+  if (
+    query.limit !== undefined &&
+    (!/^\d+$/.test(query.limit) || parseInt(query.limit, 10) < 1 || parseInt(query.limit, 10) > 50)
+  ) {
+    errors.push({
+      field: 'limit',
+      message: 'limit phải là số nguyên từ 1 đến 50',
+    });
+  }
+
+  if (errors.length > 0) {
+    return next(ApiError.badRequest('Tham số tìm kiếm không hợp lệ', errors));
+  }
+
+  next();
+};
+
+/**
+ * Middleware: Validate Tutor Approval Submission by Admin (Phase 5)
+ */
+const validateTutorApproval = (req, res, next) => {
+  const { approvalStatus, rejectionReason, verifiedQualifications } = req.body;
+  const errors = [];
+
+  if (
+    !approvalStatus ||
+    ![APPROVAL_STATUS.APPROVED, APPROVAL_STATUS.REJECTED].includes(approvalStatus)
+  ) {
+    errors.push({
+      field: 'approvalStatus',
+      message: 'Trạng thái phê duyệt phải là "approved" hoặc "rejected"',
+    });
+  }
+
+  if (approvalStatus === APPROVAL_STATUS.REJECTED) {
+    if (
+      !rejectionReason ||
+      typeof rejectionReason !== 'string' ||
+      rejectionReason.trim().length < 3
+    ) {
+      errors.push({
+        field: 'rejectionReason',
+        message: 'Lý do từ chối hồ sơ là bắt buộc và phải có ít nhất 3 ký tự',
+      });
+    }
+  }
+
+  if (verifiedQualifications !== undefined) {
+    if (!Array.isArray(verifiedQualifications)) {
+      errors.push({
+        field: 'verifiedQualifications',
+        message: 'verifiedQualifications phải là một mảng ID chứng chỉ',
+      });
+    } else {
+      const invalidIds = verifiedQualifications.filter((id) => !isValidObjectId(id));
+      if (invalidIds.length > 0) {
+        errors.push({
+          field: 'verifiedQualifications',
+          message: 'Một hoặc nhiều ID chứng chỉ trong verifiedQualifications không hợp lệ',
+        });
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    return next(ApiError.badRequest('Dữ liệu phê duyệt gia sư không hợp lệ', errors));
+  }
+
+  next();
+};
+
+/**
+ * Middleware: Validate Admin Tutor List Query Parameters (Phase 5)
+ */
+const validateGetAdminTutors = (req, res, next) => {
+  const { approvalStatus, page, limit, sortBy, order } = req.query;
+  const errors = [];
+
+  if (approvalStatus && !['pending', 'approved', 'rejected', 'all'].includes(approvalStatus)) {
+    errors.push({
+      field: 'approvalStatus',
+      message: 'approvalStatus phải là một trong: pending, approved, rejected, all',
+    });
+  }
+
+  if (page !== undefined && (!/^\d+$/.test(page) || parseInt(page, 10) < 1)) {
+    errors.push({
+      field: 'page',
+      message: 'page phải là số nguyên dương >= 1',
+    });
+  }
+
+  if (
+    limit !== undefined &&
+    (!/^\d+$/.test(limit) || parseInt(limit, 10) < 1 || parseInt(limit, 10) > 50)
+  ) {
+    errors.push({
+      field: 'limit',
+      message: 'limit phải là số nguyên từ 1 đến 50',
+    });
+  }
+
+  if (sortBy && !['submittedAt', 'createdAt', 'experienceYears', 'name'].includes(sortBy)) {
+    errors.push({
+      field: 'sortBy',
+      message: 'sortBy phải là một trong: submittedAt, createdAt, experienceYears, name',
+    });
+  }
+
+  if (order && !['asc', 'desc'].includes(order)) {
+    errors.push({
+      field: 'order',
+      message: 'order phải là "asc" hoặc "desc"',
+    });
+  }
+
+  if (errors.length > 0) {
+    return next(ApiError.badRequest('Tham số quản trị gia sư không hợp lệ', errors));
+  }
+
+  next();
+};
+
+/**
+ * Middleware: Validate Tutor ID Parameter
+ */
+const validateTutorIdParam = (req, res, next) => {
+  if (!isValidObjectId(req.params.id)) {
+    return next(ApiError.badRequest('Tutor ID không đúng định dạng ObjectId'));
+  }
+  next();
+};
+
 module.exports = {
   validateUpdateTutorProfile,
   validateSubmitTutorProfile,
   validateExpertiseHierarchy,
   checkContainsOfflineOrHybrid,
+  validateSearchTutors,
+  validateTutorApproval,
+  validateGetAdminTutors,
+  validateTutorIdParam,
 };

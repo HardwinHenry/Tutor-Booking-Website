@@ -51,6 +51,7 @@ router.get('/', (req, res) => {
         completePreference: 'POST /api/learners/preferences/complete',
       },
       tutors: {
+        search: 'GET /api/tutors',
         myProfile: 'GET /api/tutors/profile/me',
         updateProfile: 'PUT|PATCH /api/tutors/profile/me',
         submitProfile: 'POST /api/tutors/profile/submit',
@@ -59,6 +60,9 @@ router.get('/', (req, res) => {
       admin: {
         createTaxonomy: 'POST /api/admin/taxonomies',
         updateTaxonomy: 'PATCH /api/admin/taxonomies/:id',
+        listTutors: 'GET /api/admin/tutors',
+        tutorDetail: 'GET /api/admin/tutors/:id',
+        approveTutor: 'PATCH /api/admin/tutors/:id/approval',
       },
     },
   });

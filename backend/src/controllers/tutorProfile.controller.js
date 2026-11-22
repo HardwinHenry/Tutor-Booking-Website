@@ -46,9 +46,60 @@ const getPublicProfile = asyncHandler(async (req, res) => {
   return ApiResponse.ok(res, { profile }, 'Lấy thông tin công khai gia sư thành công');
 });
 
+/**
+ * Public search for tutors with filters, sorting, and pagination (Phase 5)
+ * GET /api/tutors
+ */
+const searchTutors = asyncHandler(async (req, res) => {
+  const viewerRole = req.user ? req.user.role : null;
+  const result = await tutorProfileService.searchTutors(req.query, viewerRole);
+  return ApiResponse.ok(res, result, 'Tìm kiếm gia sư thành công');
+});
+
+/**
+ * Admin: Get list of tutors with filtering, search, and pagination (Phase 5)
+ * GET /api/admin/tutors
+ */
+const getAdminTutors = asyncHandler(async (req, res) => {
+  const result = await tutorProfileService.getAdminTutors(req.query);
+  return ApiResponse.ok(res, result, 'Lấy danh sách gia sư cho quản trị viên thành công');
+});
+
+/**
+ * Admin: Get full tutor detail by ID for review (Phase 5)
+ * GET /api/admin/tutors/:id
+ */
+const getAdminTutorDetail = asyncHandler(async (req, res) => {
+  const profile = await tutorProfileService.getAdminTutorDetail(req.params.id);
+  return ApiResponse.ok(res, { profile }, 'Lấy chi tiết hồ sơ gia sư thành công');
+});
+
+/**
+ * Admin: Approve or reject tutor profile (Phase 5)
+ * PATCH /api/admin/tutors/:id/approval
+ */
+const updateTutorApproval = asyncHandler(async (req, res) => {
+  const profile = await tutorProfileService.updateTutorApproval(
+    req.params.id,
+    req.user._id,
+    req.body
+  );
+  return ApiResponse.ok(
+    res,
+    { profile },
+    profile.approvalStatus === 'approved'
+      ? 'Phê duyệt hồ sơ gia sư thành công'
+      : 'Đã từ chối hồ sơ gia sư'
+  );
+});
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
   submitMyProfile,
   getPublicProfile,
+  searchTutors,
+  getAdminTutors,
+  getAdminTutorDetail,
+  updateTutorApproval,
 };
