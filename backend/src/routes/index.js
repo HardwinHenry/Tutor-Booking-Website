@@ -10,6 +10,7 @@ const tutorRoutes = require('./tutor.routes');
 const recommendationRoutes = require('./recommendation.routes');
 const availabilityRoutes = require('./availability.routes');
 const bookingRoutes = require('./booking.routes');
+const calendarRoutes = require('./calendar.routes');
 
 const router = express.Router();
 
@@ -25,6 +26,7 @@ router.use('/tutors', tutorRoutes);
 router.use('/recommendations', recommendationRoutes);
 router.use('/availability', availabilityRoutes);
 router.use('/bookings', bookingRoutes);
+router.use('/calendar', calendarRoutes);
 
 // Root API Information
 router.get('/', (req, res) => {
@@ -82,6 +84,15 @@ router.get('/', (req, res) => {
         reject: 'PATCH /api/bookings/:id/reject',
         cancel: 'PATCH /api/bookings/:id/cancel',
         complete: 'PATCH /api/bookings/:id/complete',
+      },
+      calendar: {
+        status: 'GET /api/calendar/status',
+        oauth: 'GET /api/calendar/oauth',
+        callback: 'GET /api/calendar/oauth/callback',
+        disconnect: 'POST /api/calendar/disconnect',
+        retrySync: 'POST /api/calendar/sync/retry',
+        bookingSyncLogs: 'GET /api/calendar/sync/:bookingId',
+        adminSync: 'GET /api/calendar/admin/sync',
       },
       admin: {
         createTaxonomy: 'POST /api/admin/taxonomies',
