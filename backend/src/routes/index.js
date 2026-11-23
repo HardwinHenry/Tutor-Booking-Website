@@ -9,6 +9,7 @@ const learnerRoutes = require('./learner.routes');
 const tutorRoutes = require('./tutor.routes');
 const recommendationRoutes = require('./recommendation.routes');
 const availabilityRoutes = require('./availability.routes');
+const bookingRoutes = require('./booking.routes');
 
 const router = express.Router();
 
@@ -23,6 +24,7 @@ router.use('/learners', learnerRoutes);
 router.use('/tutors', tutorRoutes);
 router.use('/recommendations', recommendationRoutes);
 router.use('/availability', availabilityRoutes);
+router.use('/bookings', bookingRoutes);
 
 // Root API Information
 router.get('/', (req, res) => {
@@ -72,12 +74,22 @@ router.get('/', (req, res) => {
         delete: 'DELETE /api/availability/:id',
         tutorAvailability: 'GET /api/tutors/:id/availability',
       },
+      bookings: {
+        create: 'POST /api/bookings',
+        mine: 'GET /api/bookings/me',
+        detail: 'GET /api/bookings/:id',
+        confirm: 'PATCH /api/bookings/:id/confirm',
+        reject: 'PATCH /api/bookings/:id/reject',
+        cancel: 'PATCH /api/bookings/:id/cancel',
+        complete: 'PATCH /api/bookings/:id/complete',
+      },
       admin: {
         createTaxonomy: 'POST /api/admin/taxonomies',
         updateTaxonomy: 'PATCH /api/admin/taxonomies/:id',
         listTutors: 'GET /api/admin/tutors',
         tutorDetail: 'GET /api/admin/tutors/:id',
         approveTutor: 'PATCH /api/admin/tutors/:id/approval',
+        listBookings: 'GET /api/admin/bookings',
       },
     },
   });

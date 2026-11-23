@@ -485,6 +485,23 @@ Lưu snapshot thời gian và giá tại thời điểm tạo/xác nhận bookin
 
 # Giai đoạn triển khai Backend
 
+## Bảng tổng hợp tiến độ triển khai (Progress Dashboard)
+
+| Giai đoạn | Mô tả phạm vi | Trạng thái | Kiểm thử tự động (Test Suites) |
+|---|---|---|---|
+| **Phase 1** | Khởi tạo Backend và nền tảng kỹ thuật | **Đã hoàn thành** (100%) | `health.test.js`, `errorHandling.test.js` (5 tests PASS) |
+| **Phase 2** | Xác thực và phân quyền (Auth & RBAC) | **Đã hoàn thành** (100%) | `auth.test.js` (24 tests PASS) |
+| **Phase 3** | Taxonomy và cấu hình bộ câu hỏi | **Đã hoàn thành** (100%) | `taxonomy.test.js` (19 tests PASS) |
+| **Phase 4** | Onboarding, LearnerPreference & TutorProfile | **Đã hoàn thành** (100%) | `learnerPreference.test.js`, `tutorProfile.test.js` (21 tests PASS) |
+| **Phase 5** | Admin duyệt Tutor & Tìm kiếm gia sư | **Đã hoàn thành** (100%) | `tutorSearchAndApproval.test.js` (28 tests PASS) |
+| **Phase 6** | Recommendation Service: Content-based Filtering | **Đã hoàn thành** (100%) | `recommendation.test.js` (18 tests PASS) |
+| **Phase 7** | Availability CRUD & Kiểm tra khả dụng | **Đã hoàn thành** (100%) | `availability.test.js` (23 tests PASS) |
+| **Phase 8** | Booking & Vòng đời yêu cầu | **Đã hoàn thành** (100%) | `booking.test.js` (33 tests PASS) |
+| **Phase 9** | Google Calendar API OAuth & Sync | **Chưa triển khai** (Kế hoạch tiếp theo) | Kế hoạch tích hợp Phase 9 |
+| **Phase 10** | Review, Admin, bảo mật & vận hành | **Chưa triển khai** (Pending) | Kế hoạch hoàn thiện Phase 10 |
+
+**Tổng tiến độ Backend:** Đã hoàn thành 8/10 giai đoạn (80%) | Toàn bộ 10/10 test suites, 197/197 tests PASS (100%).
+
 ## Giai đoạn 1 – Khởi tạo Backend và nền tảng kỹ thuật
 
 **Mục tiêu:** Tạo server ổn định, kết nối MongoDB và thiết lập quy chuẩn chung.
@@ -501,6 +518,14 @@ Lưu snapshot thời gian và giá tại thời điểm tạo/xác nhận bookin
 
 **Đầu ra:** Server chạy, kết nối DB, health check và xử lý lỗi thống nhất.  
 **Tiêu chí hoàn thành:** Có thể khởi động server từ hướng dẫn; thiếu biến bắt buộc sẽ báo lỗi rõ ràng; không log secret.
+
+**Trạng thái triển khai:** Đã hoàn thành (Phase 1 Completed)
+- [x] Cấu hình môi trường an toàn (`backend/src/config/env.js`): Quản lý và kiểm tra các biến bắt buộc (`PORT`, `NODE_ENV`, `MONGODB_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET`,...), chặn server khởi động khi thiếu biến môi trường, bảo mật không để lộ secret trong logs.
+- [x] Kết nối MongoDB Atlas (`backend/src/config/db.js`): Mongoose connection pooling, xử lý các sự kiện `connected`, `error`, `disconnected`, `reconnected`, hỗ trợ ngắt kết nối an toàn (`disconnectDB`).
+- [x] Chuẩn hóa định dạng Response & Error (`backend/src/utils/apiResponse.js`, `backend/src/utils/apiError.js`, `backend/src/utils/asyncHandler.js`).
+- [x] Centralized Error Handling & Middlewares (`backend/src/middlewares/errorHandler.js`, `backend/src/middlewares/notFound.js`, `backend/src/middlewares/requestLogger.js`, `backend/src/middlewares/rateLimiter.js`).
+- [x] Health Check & Root APIs (`backend/src/routes/health.routes.js`, `backend/src/controllers/health.controller.js`): `GET /api/health`, `GET /health`, `GET /api`.
+- [x] Kiểm thử tự động (`backend/tests/health.test.js`, `backend/tests/errorHandling.test.js`): 5/5 test cases vượt qua 100%.
 
 ## Giai đoạn 2 – Xác thực và phân quyền
 
@@ -527,6 +552,19 @@ Lưu snapshot thời gian và giá tại thời điểm tạo/xác nhận bookin
 **Đầu ra:** Auth API, JWT middleware và quy tắc bảo mật.  
 **Tiêu chí hoàn thành:** Endpoint riêng tư không truy cập được khi thiếu token, sai role hoặc tài khoản bị khóa.
 
+**Trạng thái triển khai:** Đã hoàn thành (Phase 2 Completed)
+- [x] Model `User` (`backend/src/models/user.model.js`): Quản lý các trường `email`, `password` (bcrypt hash), `fullName`, `phone`, `role` (`learner`, `tutor`, `admin`), `status` (`active`, `locked`, `disabled`), `avatar`, timestamps.
+- [x] Quản lý Token bảo mật (`backend/src/utils/token.util.js`): Cấp phát Access Token ngắn hạn và Refresh Token dài hạn, hỗ trợ xoay vòng và thu hồi token.
+- [x] Middleware xác thực & phân quyền (`backend/src/middlewares/auth.js`): `authenticate` (xác thực token, chặn tài khoản `locked`/`disabled`), `authorize('learner' | 'tutor' | 'admin')` kiểm tra quyền theo vai trò.
+- [x] Rate Limiting bảo vệ Auth (`backend/src/middlewares/rateLimiter.js`): Ngăn chặn brute force đối với các endpoint nhạy cảm.
+- [x] 5 Endpoints API Auth hoàn thiện:
+  - `POST /api/auth/register`: Đăng ký tài khoản (mặc định vai trò `learner` hoặc `tutor`, chặn đăng ký `admin`), mã hóa mật khẩu, kiểm tra trùng email.
+  - `POST /api/auth/login`: Đăng nhập, chuẩn hóa email, kiểm tra trạng thái khóa tài khoản, cấp access & refresh tokens.
+  - `POST /api/auth/refresh`: Cấp mới access token từ refresh token hợp lệ (hỗ trợ alias `/api/auth/refresh-token`).
+  - `POST /api/auth/logout`: Đăng xuất an toàn, thu hồi refresh token.
+  - `GET /api/auth/me`: Lấy thông tin tài khoản hiện tại (loại bỏ trường mật khẩu hash).
+- [x] Kiểm thử tự động toàn diện (`backend/tests/auth.test.js`): 24/24 test cases vượt qua 100%.
+
 ## Giai đoạn 3 – Taxonomy và cấu hình bộ câu hỏi
 
 **Mục tiêu:** Tạo một nguồn danh mục chuẩn dùng chung cho hai bộ câu hỏi.
@@ -551,6 +589,20 @@ Lưu snapshot thời gian và giá tại thời điểm tạo/xác nhận bookin
 
 **Đầu ra:** Taxonomy và bộ câu hỏi có phiên bản.  
 **Tiêu chí hoàn thành:** Hai vai trò dùng chung ID danh mục; Q2/Q3 thay đổi theo câu trả lời trước; backend từ chối option ID không hợp lệ hoặc đã inactive.
+
+**Trạng thái triển khai:** Đã hoàn thành (Phase 3 Completed)
+- [x] Model `Taxonomy` (`backend/src/models/taxonomy.model.js`): Thiết kế mô hình danh mục phân cấp Category → Subject → Topic và các nhóm tag dùng chung (teaching methods, styles, materials, support,...), quản lý quan hệ `parentId`, `ancestors`, `slug`, `sortOrder`, trạng thái `active`.
+- [x] Cấu hình Metadata Questionnaire (`backend/src/constants/questionnaire.config.js`): Định nghĩa chi tiết cấu trúc 28 câu hỏi cho Learner và Tutor, phiên bản questionnaire (`v1.0.0`), loại câu hỏi (single/multi-select, number, range, flexible), validation dependencies (Q1→Q2→Q3) và giới hạn lựa chọn.
+- [x] Seed data taxonomy mẫu (`backend/src/seeds/taxonomy.seed.js`): Khởi tạo danh mục tiêu chuẩn cho hệ thống (CNTT, Ngoại ngữ, Kỹ năng mềm, Toán học,...).
+- [x] Taxonomy Service Helper (`backend/src/services/taxonomy.service.js`): Cung cấp `validateTaxonomyIds` kiểm tra nhanh tính hợp lệ và trạng thái active của danh sách ID taxonomy.
+- [x] 6 Endpoints API hoàn thiện:
+  - `GET /api/questionnaires/:role`: Tải bộ câu hỏi và metadata theo vai trò (`learner`/`tutor`).
+  - `GET /api/taxonomies`: Lấy toàn bộ cây danh mục active (hỗ trợ lọc theo `type`).
+  - `GET /api/taxonomies/:id/children`: Lấy danh mục con trực tiếp theo ID cha.
+  - `GET /api/tags`: Lấy danh sách tag dùng chung theo nhóm tag.
+  - `POST /api/admin/taxonomies`: Admin tạo mới category/subject/topic, tự động sinh slug, kiểm tra trùng lặp và xác thực parent.
+  - `PATCH /api/admin/taxonomies/:id`: Admin cập nhật tên, thứ tự và soft-deactivate (chuyển `active: false`, không xóa cứng dữ liệu đang được tham chiếu).
+- [x] Kiểm thử tự động toàn diện (`backend/tests/taxonomy.test.js`): 19/19 test cases vượt qua 100%.
 
 ## Giai đoạn 4 – Onboarding, LearnerPreference và TutorProfile
 
@@ -578,6 +630,23 @@ Lưu snapshot thời gian và giá tại thời điểm tạo/xác nhận bookin
 **Đầu ra:** Hai profile chuẩn hóa, hỗ trợ lưu tiến độ.  
 **Tiêu chí hoàn thành:** Learner không thể cập nhật hồ sơ Tutor và ngược lại; dữ liệu sai enum/ID bị từ chối; profile hoàn chỉnh có thể dùng cho recommendation.
 
+**Trạng thái triển khai:** Đã hoàn thành (Phase 4 Completed)
+- [x] Model `LearnerPreference` (`backend/src/models/learnerPreference.model.js`): Lưu trữ cấu trúc hóa toàn bộ 28 câu hỏi của Learner (lĩnh vực, môn học, chuyên môn, cấp độ hiện tại & mục tiêu, ngân sách, khung giờ, ngày học, thời lượng, hình thức online/offline, phong cách gia sư mong muốn, hỗ trợ cần thiết,...), theo dõi `completionStatus` (`draft`, `in_progress`, `completed`).
+- [x] Model `TutorProfile` (`backend/src/models/tutorProfile.model.js`): Lưu trữ hồ sơ năng lực 28 câu hỏi của Tutor (môn có thể dạy, cấp độ tiếp nhận, học phí, khu vực và bán kính nhận dạy, kinh nghiệm, danh sách bằng cấp/chứng chỉ qualifications, trạng thái duyệt `approvalStatus`: `draft`, `pending`, `approved`, `rejected`).
+- [x] Validators & Logic nghiệp vụ chặt chẽ (`learnerPreference.validator.js`, `tutorProfile.validator.js`):
+  - Kiểm tra tính phụ thuộc danh mục Q1 → Q2 → Q3 (Subject phải thuộc Category).
+  - Kiểm tra điều kiện có điều kiện: Bắt buộc chọn `offlineLocations` khi chọn hình thức Offline.
+  - Giới hạn số lượng lựa chọn: Không quá 3 lựa chọn cho phong cách (Q12) và ưu tiên (Q22).
+  - Chống giả mạo dữ liệu (Anti-tampering): Chặn client tự ý đặt trạng thái `approved` hoặc tự xác minh chứng chỉ `isVerified`.
+- [x] 6 Endpoints API Onboarding hoàn thiện:
+  - `GET /api/learners/preferences/me`: Xem hồ sơ nhu cầu học của Learner.
+  - `PUT/PATCH /api/learners/preferences/me`: Lưu nháp/cập nhật từng phần câu trả lời.
+  - `POST /api/learners/preferences/complete`: Hoàn tất onboarding học viên với kiểm tra toàn diện.
+  - `GET /api/tutors/profile/me`: Xem hồ sơ năng lực của Tutor.
+  - `PUT/PATCH /api/tutors/profile/me`: Lưu nháp hồ sơ gia sư.
+  - `POST /api/tutors/profile/submit`: Nộp hồ sơ xét duyệt với trạng thái `pending`.
+- [x] Kiểm thử tự động toàn diện (`backend/tests/learnerPreference.test.js`, `backend/tests/tutorProfile.test.js`): 21/21 test cases vượt qua 100%.
+
 ## Giai đoạn 5 – Admin duyệt Tutor và tìm kiếm gia sư
 
 **Mục tiêu:** Chỉ hiển thị gia sư đủ điều kiện và cung cấp tìm kiếm cơ bản.
@@ -600,6 +669,19 @@ Lưu snapshot thời gian và giá tại thời điểm tạo/xác nhận bookin
 
 **Đầu ra:** Admin approval và Tutor search API.  
 **Tiêu chí hoàn thành:** Tài khoản/profile không đủ điều kiện không xuất hiện trong kết quả public; filter và pagination hoạt động ổn định.
+
+**Trạng thái triển khai:** Đã hoàn thành (Phase 5 Completed)
+- [x] Quy trình Admin xét duyệt hồ sơ gia sư: Xem hàng đợi hồ sơ `pending`, xem chi tiết bằng cấp/chứng chỉ chưa che mặt nạ, duyệt (`approved`) kèm xác minh chứng chỉ (`verifiedQualificationIds`), hoặc từ chối (`rejected`) bắt buộc kèm lý do `rejectionReason`.
+- [x] Tìm kiếm gia sư công khai đa tiêu chí (`GET /api/tutors`): Lọc theo lĩnh vực (`categoryId`), môn học (`subjectIds`), hình thức học (`mode`), khoảng học phí (`priceMin`, `priceMax`), khu vực (`area`), và tìm kiếm từ khóa (`q` / `search`) theo tên hoặc lời giới thiệu.
+- [x] Bảo vệ dữ liệu cá nhân & An toàn hiển thị: Chỉ hiển thị gia sư đã được duyệt (`approved`), hoàn tất hồ sơ (`completed`) và tài khoản đang hoạt động (`active`). Tự động che giấu số điện thoại, lý do từ chối và thông tin người duyệt khi trả về cho public/learner.
+- [x] Phân trang (Pagination) và Sắp xếp (Sorting) chặt chẽ với whitelist tham số hợp lệ, kiểm tra định dạng ObjectId và khoảng giá hợp lệ (`priceMin <= priceMax`).
+- [x] 5 Endpoints API hoàn thiện:
+  - `GET /api/tutors`: Tìm kiếm gia sư công khai với bộ lọc và phân trang.
+  - `GET /api/tutors/:id`: Xem hồ sơ chi tiết gia sư đã duyệt và active.
+  - `GET /api/admin/tutors`: Admin tra cứu danh sách toàn bộ gia sư (hỗ trợ lọc `approvalStatus=pending/rejected/approved` và tìm kiếm tên/SĐT).
+  - `GET /api/admin/tutors/:id`: Admin xem chi tiết toàn diện hồ sơ gia sư và chứng chỉ.
+  - `PATCH /api/admin/tutors/:id/approval`: Admin phê duyệt hoặc từ chối hồ sơ gia sư.
+- [x] Kiểm thử tự động toàn diện (`backend/tests/tutorSearchAndApproval.test.js`): 28/28 test cases vượt qua 100%.
 
 ## Giai đoạn 6 – Recommendation Service: Content-based Filtering
 
@@ -713,6 +795,19 @@ Ví dụ response:
 **Đầu ra:** Recommendation Service, công thức được tài liệu hóa, response có điểm và lý do.  
 **Tiêu chí hoàn thành:** Không sử dụng ML; điểm có thể kiểm tra lại; không đề xuất Tutor chưa duyệt hoặc không đạt điều kiện bắt buộc.
 
+**Trạng thái triển khai:** Đã hoàn thành (Phase 6 Completed)
+- [x] Thuật toán Recommendation Content-based Filtering (CBF) chuẩn xác, phiên bản `cbf-v1`, áp dụng công thức chấm điểm 8 thành phần minh bạch:
+  `MatchScore = 0.30S + 0.20L + 0.15B + 0.10M + 0.10T + 0.05A + 0.05E + 0.05R`
+- [x] Kiến trúc xử lý hai tầng (Two-stage Processing):
+  - **Tầng A (Candidate Eligibility Filtering):** Loại trừ tuyệt đối gia sư chưa duyệt hoặc tài khoản bị khóa; kiểm tra môn học/chuyên môn; kiểm tra phạm vi cấp độ nhận dạy; áp dụng Hard Filter cho chứng chỉ xác minh khi learner yêu cầu; áp dụng Hard Filter cho ngân sách khi kích hoạt tùy chọn `strictBudget`.
+  - **Tầng B (Content-based Scoring & Ranking):** Tính điểm chi tiết từng tiêu chí, gán điểm prior trung lập công bằng cho gia sư mới chưa có đánh giá, sinh mảng lý do phù hợp (`matchedReasons`) trung thực và có thể giải thích được.
+- [x] Telemetry Logging (`backend/src/models/recommendationLog.model.js`): Ghi nhận lịch sử truy vấn gợi ý để phục vụ theo dõi chất lượng và tối ưu hóa hệ thống.
+- [x] Endpoints API hoàn thiện:
+  - `POST /api/recommendations/tutors`: Nhận gợi ý gia sư cho Learner đã đăng nhập và hoàn thành onboarding (hỗ trợ lọc bổ sung theo `mode`, `minScore`, `page`, `limit`).
+  - `GET /api/recommendations/tutors`: Alias truy vấn thuận tiện.
+  - Hỗ trợ quyền Admin xem trước (preview) kết quả gợi ý của bất kỳ học viên nào qua tham số `?learnerId=...`.
+- [x] Kiểm thử tự động toàn diện (`backend/tests/recommendation.test.js`): 18/18 test cases vượt qua 100%.
+
 ## Giai đoạn 7 – Availability CRUD và kiểm tra khả dụng
 
 **Mục tiêu:** Quản lý slot thực tế và bảo vệ lịch của Tutor.
@@ -745,6 +840,23 @@ Nếu nhóm quyết định `pending` giữ chỗ, phải bổ sung `reserved`, 
 
 **Đầu ra:** Availability CRUD và API đọc slot khả dụng.  
 **Tiêu chí hoàn thành:** Slot chồng lấn bị từ chối; slot booked không bị xóa/sửa trái phép; thời gian hiển thị đúng timezone.
+
+**Trạng thái triển khai:** Đã hoàn thành (Phase 7 Completed)
+- [x] Model `AvailabilitySlot` (`backend/src/models/availabilitySlot.model.js`): Quản lý slot của gia sư với các trường `tutorId`, `startAt`, `endAt`, `timezone`, `status` (`available`, `booked`, `closed`), `bookingId`, audit fields.
+- [x] Quy tắc kiểm tra thời gian nghiêm ngặt:
+  - Bắt buộc `startAt < endAt` và thời gian bắt đầu không nằm trong quá khứ.
+  - Kiểm tra định danh múi giờ IANA chuẩn (ví dụ `Asia/Ho_Chi_Minh`).
+  - Chống trùng lặp / chồng lấn thời gian (overlap check) giữa các slot của cùng một gia sư.
+- [x] Cơ chế bảo vệ slot booked: Chặn sửa đổi hoặc xóa các slot đang gắn với booking confirmed.
+- [x] Bộ helper khóa/mở slot nguyên tử (`atomicBookSlot`, `atomicReleaseSlot`): Sử dụng `findOneAndUpdate` nguyên tử chuẩn bị cho hệ thống Booking chống race condition.
+- [x] 6 Endpoints API hoàn thiện:
+  - `POST /api/availability`: Tutor tạo slot rảnh mới.
+  - `GET /api/availability/mine`: Tutor xem danh sách slot của chính mình (hỗ trợ lọc ngày và trạng thái).
+  - `PATCH /api/availability/:id`: Tutor cập nhật thời gian, ghi chú, trạng thái slot.
+  - `DELETE /api/availability/:id`: Tutor xóa slot đang mở.
+  - `GET /api/tutors/:id/availability`: Học viên/Public tra cứu slot khả dụng trong tương lai theo khoảng thời gian (`from`, `to`) và thời lượng tối thiểu (`minDuration`).
+  - `GET /api/availability/tutors/:id`: Alias tương thích.
+- [x] Kiểm thử tự động toàn diện (`backend/tests/availability.test.js`): 23/23 test cases vượt qua 100%.
 
 ## Giai đoạn 8 – Booking và vòng đời yêu cầu
 
@@ -789,6 +901,24 @@ Nếu nhóm quyết định `pending` giữ chỗ, phải bổ sung `reserved`, 
 **Đầu ra:** Booking model, state machine, quyền sở hữu và kiểm soát đặt trùng.  
 **Tiêu chí hoàn thành:** Không có hai booking confirmed cùng chiếm một slot; không thể chuyển trạng thái trái quyền hoặc trái state machine.
 
+**Trạng thái triển khai:** Đã hoàn thành (Phase 8 Completed)
+- [x] Tạo `Booking` model (`backend/src/models/booking.model.js`) lưu đầy đủ snapshots (`startAt`, `endAt`, `timezone`, `durationMinutes`, `price`, `currency`, `subjectId`, `subjectName`, `learningMode`, `location`, `learnerNote`, `tutorNote`) và audit fields (`confirmedAt`, `rejectedAt`, `rejectionReason`, `cancelledAt`, `cancelledBy`, `cancelledByRole`, `cancelReason`, `completedAt`, `completedBy`).
+- [x] Định nghĩa hằng số và quy tắc State Machine (`backend/src/constants/bookingStatus.js`): `pending` → `confirmed` | `rejected` | `cancelled`; `confirmed` → `cancelled` | `completed`; chặn chuyển đổi từ trạng thái cuối.
+- [x] Cơ chế khóa slot nguyên tử (Atomic Slot Locking) & Race Condition Protection: Khi Tutor xác nhận, gọi `atomicBookSlot` chuyển slot `available → booked` và gắn `bookingId`. Tự động từ chối các booking pending cạnh tranh cùng slot.
+- [x] Cơ chế giải phóng slot nguyên tử (Atomic Slot Release): Khi booking đã confirmed bị hủy, gọi `atomicReleaseSlot` chuyển slot `booked → available`.
+- [x] Phân quyền & Kiểm soát truy cập nghiêm ngặt: Learner chỉ xem/hủy booking của mình; Tutor chỉ xem/xác nhận/từ chối/hủy/hoàn tất booking dạy của mình; Admin quản lý toàn diện qua `/api/admin/bookings`.
+- [x] Hệ thống sự kiện nội bộ `bookingEvents` (`backend/src/events/booking.events.js`): Phát các event `booking.created`, `booking.confirmed`, `booking.rejected`, `booking.cancelled`, `booking.completed` sẵn sàng tích hợp Google Calendar (Phase 9) và Review/Notification (Phase 10).
+- [x] 8 Endpoints API hoàn thiện:
+  - `POST /api/bookings`
+  - `GET /api/bookings/me`
+  - `GET /api/bookings/:id`
+  - `PATCH /api/bookings/:id/confirm`
+  - `PATCH /api/bookings/:id/reject`
+  - `PATCH /api/bookings/:id/cancel`
+  - `PATCH /api/bookings/:id/complete`
+  - `GET /api/admin/bookings`
+- [x] Kiểm thử tự động toàn diện (`backend/tests/booking.test.js`): 33/33 test cases vượt qua 100% (Tổng toàn dự án: 10/10 suites, 197/197 tests PASS).
+
 ## Giai đoạn 9 – Google Calendar API
 
 **Mục tiêu:** Đồng bộ booking đã xác nhận vào lịch của Learner và Tutor đã kết nối.
@@ -815,6 +945,13 @@ Nếu nhóm quyết định `pending` giữ chỗ, phải bổ sung `reserved`, 
 
 **Đầu ra:** OAuth service, Calendar integration, connection/event collections và retry.  
 **Tiêu chí hoàn thành:** Booking xác nhận vẫn hợp lệ khi Calendar lỗi; sync status được lưu riêng; retry idempotent.
+
+**Trạng thái triển khai:** Chưa triển khai (Kế hoạch tiếp theo / Next Step)
+- [ ] Xây dựng OAuth 2.0 Authorization Code Flow kết nối Google Calendar (`/api/calendar/oauth`, `/api/calendar/oauth/callback`).
+- [ ] Mã hóa và lưu trữ an toàn refresh token, access token trong cơ sở dữ liệu (`CalendarConnection` model).
+- [ ] Lắng nghe sự kiện `booking.confirmed` từ `bookingEvents` để tự động tạo Google Calendar Event cho cả Learner và Tutor đã liên kết.
+- [ ] Đồng bộ cập nhật hoặc xóa event trên Google Calendar khi booking bị hủy (`booking.cancelled`).
+- [ ] Quản lý trạng thái đồng bộ (`not_connected`, `pending`, `synced`, `failed`, `cancelled`) và cơ chế retry idempotent.
 
 ## Giai đoạn 10 – Review, Admin, bảo mật và vận hành
 
@@ -844,6 +981,12 @@ Nếu nhóm quyết định `pending` giữ chỗ, phải bổ sung `reserved`, 
 
 **Đầu ra:** Review API, Admin API, test suite, tài liệu API và deploy guide.  
 **Tiêu chí hoàn thành:** Nghiệp vụ cốt lõi có test; quyền truy cập được kiểm tra; có logging/backup và quy trình triển khai.
+
+**Trạng thái triển khai:** Chưa triển khai (Pending)
+- [ ] Review & Rating System: Chỉ cho phép Learner có booking `completed` đánh giá, tự động tính toán lại `ratingSummary` cho Tutor.
+- [ ] Mở rộng Admin Dashboard: Quản lý người dùng (`/api/admin/users`), khóa/mở tài khoản, giám sát trạng thái đồng bộ Calendar.
+- [ ] Tăng cường bảo mật: Rate limiting chuyên sâu, NoSQL injection protection, input sanitization toàn diện.
+- [ ] Logging, monitoring & MongoDB backup/restore automation cho môi trường production.
 
 # Quy tắc trạng thái và nghiệp vụ
 
@@ -969,14 +1112,14 @@ Tên endpoint có thể điều chỉnh để tương thích API đang có; cầ
 
 # Thứ tự ưu tiên triển khai
 
-| Mức ưu tiên | Phạm vi | Lý do |
-|---|---|---|
-| P0 – Nền tảng | Auth/role, config, database, validation, error handling | Bắt buộc cho mọi module. |
-| P1 – Dữ liệu gốc | Taxonomy, questionnaire version, LearnerPreference, TutorProfile, onboarding | Tạo nguồn dữ liệu chính xác cho tìm kiếm và gợi ý. |
-| P2 – Tutor discovery | Admin approval, Tutor search, Content-based Filtering | Đáp ứng mục tiêu kết nối/gợi ý gia sư. |
-| P3 – Booking core | Availability CRUD, booking state machine, chống đặt trùng | Hoàn tất hành trình chọn và đặt gia sư. |
-| P4 – Chất lượng và tích hợp | Review/rating, Google Calendar, notification | Cải thiện trải nghiệm và đồng bộ lịch. |
-| P5 – Vận hành nâng cao | Admin dashboard, analytics, monitoring, backup nâng cao | Phục vụ mở rộng và vận hành lâu dài. |
+| Mức ưu tiên | Phạm vi | Lý do | Trạng thái triển khai |
+|---|---|---|---|
+| P0 – Nền tảng | Auth/role, config, database, validation, error handling | Bắt buộc cho mọi module. | **Hoàn thành 100%** (Phase 1, 2) |
+| P1 – Dữ liệu gốc | Taxonomy, questionnaire version, LearnerPreference, TutorProfile, onboarding | Tạo nguồn dữ liệu chính xác cho tìm kiếm và gợi ý. | **Hoàn thành 100%** (Phase 3, 4) |
+| P2 – Tutor discovery | Admin approval, Tutor search, Content-based Filtering | Đáp ứng mục tiêu kết nối/gợi ý gia sư. | **Hoàn thành 100%** (Phase 5, 6) |
+| P3 – Booking core | Availability CRUD, booking state machine, chống đặt trùng | Hoàn tất hành trình chọn và đặt gia sư. | **Hoàn thành 100%** (Phase 7, 8) |
+| P4 – Chất lượng và tích hợp | Review/rating, Google Calendar, notification | Cải thiện trải nghiệm và đồng bộ lịch. | **Kế hoạch tiếp theo** (Phase 9, 10) |
+| P5 – Vận hành nâng cao | Admin dashboard, analytics, monitoring, backup nâng cao | Phục vụ mở rộng và vận hành lâu dài. | **Kế hoạch tiếp theo** (Phase 10) |
 
 Có thể triển khai Availability song song với Recommendation sau khi TutorProfile và taxonomy ổn định. Không nên triển khai booking trước khi thống nhất state machine, quy tắc chiếm slot và quyền sở hữu.
 

@@ -86,15 +86,16 @@ const optionalAuthenticate = async (req, res, next) => {
  * @param  {...string} roles Allowed roles for accessing the endpoint
  */
 const authorize = (...roles) => {
+  const flatRoles = roles.flat();
   return (req, res, next) => {
     if (!req.user) {
       return next(ApiError.unauthorized('Yêu cầu xác thực trước khi phân quyền'));
     }
 
-    if (!roles.includes(req.user.role)) {
+    if (!flatRoles.includes(req.user.role)) {
       return next(
         ApiError.forbidden(
-          `Bạn không có quyền thực hiện hành động này. Yêu cầu một trong các quyền: [${roles.join(', ')}]`
+          `Bạn không có quyền thực hiện hành động này. Yêu cầu một trong các quyền: [${flatRoles.join(', ')}]`
         )
       );
     }
