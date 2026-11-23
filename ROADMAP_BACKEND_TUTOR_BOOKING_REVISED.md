@@ -497,10 +497,10 @@ Lưu snapshot thời gian và giá tại thời điểm tạo/xác nhận bookin
 | **Phase 6** | Recommendation Service: Content-based Filtering | **Đã hoàn thành** (100%) | `recommendation.test.js` (18 tests PASS) |
 | **Phase 7** | Availability CRUD & Kiểm tra khả dụng | **Đã hoàn thành** (100%) | `availability.test.js` (23 tests PASS) |
 | **Phase 8** | Booking & Vòng đời yêu cầu | **Đã hoàn thành** (100%) | `booking.test.js` (33 tests PASS) |
-| **Phase 9** | Google Calendar API OAuth & Sync | **Chưa triển khai** (Kế hoạch tiếp theo) | Kế hoạch tích hợp Phase 9 |
+| **Phase 9** | Google Calendar API OAuth & Sync | **Đã hoàn thành** (100%) | `calendar.test.js` (28 tests PASS) |
 | **Phase 10** | Review, Admin, bảo mật & vận hành | **Chưa triển khai** (Pending) | Kế hoạch hoàn thiện Phase 10 |
 
-**Tổng tiến độ Backend:** Đã hoàn thành 8/10 giai đoạn (80%) | Toàn bộ 10/10 test suites, 197/197 tests PASS (100%).
+**Tổng tiến độ Backend:** Đã hoàn thành 9/10 giai đoạn (90%) | Toàn bộ 11/11 test suites, 225/225 tests PASS (100%).
 
 ## Giai đoạn 1 – Khởi tạo Backend và nền tảng kỹ thuật
 
@@ -946,12 +946,21 @@ Nếu nhóm quyết định `pending` giữ chỗ, phải bổ sung `reserved`, 
 **Đầu ra:** OAuth service, Calendar integration, connection/event collections và retry.  
 **Tiêu chí hoàn thành:** Booking xác nhận vẫn hợp lệ khi Calendar lỗi; sync status được lưu riêng; retry idempotent.
 
-**Trạng thái triển khai:** Chưa triển khai (Kế hoạch tiếp theo / Next Step)
-- [ ] Xây dựng OAuth 2.0 Authorization Code Flow kết nối Google Calendar (`/api/calendar/oauth`, `/api/calendar/oauth/callback`).
-- [ ] Mã hóa và lưu trữ an toàn refresh token, access token trong cơ sở dữ liệu (`CalendarConnection` model).
-- [ ] Lắng nghe sự kiện `booking.confirmed` từ `bookingEvents` để tự động tạo Google Calendar Event cho cả Learner và Tutor đã liên kết.
-- [ ] Đồng bộ cập nhật hoặc xóa event trên Google Calendar khi booking bị hủy (`booking.cancelled`).
-- [ ] Quản lý trạng thái đồng bộ (`not_connected`, `pending`, `synced`, `failed`, `cancelled`) và cơ chế retry idempotent.
+**Trạng thái triển khai:** Đã hoàn thành (Phase 9 Completed)
+- [x] Xây dựng OAuth 2.0 Authorization Code Flow kết nối Google Calendar (`GET /api/calendar/oauth`, `GET /api/calendar/oauth/callback`) với state token ký số JWT chống tấn công CSRF và scope tối thiểu (`calendar.events`, `openid`, `email`, `profile`).
+- [x] Mã hóa và lưu trữ bảo mật tokens (`CalendarConnection` model): Thuật toán mã hóa đối xứng xác thực AES-256-GCM với IV 16-byte ngẫu nhiên và auth tag chống can thiệp. Cơ chế tự động làm mới access token khi hết hạn và đánh dấu `revoked` khi refresh token bị từ chối.
+- [x] Tự động đồng bộ lịch hai chiều qua Event-driven Architecture:
+  - Lắng nghe sự kiện `booking.confirmed` từ `bookingEvents`: Tự động tạo Google Calendar event cho cả Learner và Tutor đã liên kết song song (`Promise.allSettled`).
+  - Lắng nghe sự kiện `booking.cancelled`: Tự động xóa hoặc hủy bỏ event tương ứng trên Google Calendar và cập nhật trạng thái `cancelled`.
+- [x] Quản lý trạng thái đồng bộ tách biệt (`CalendarEvent` model) với 5 trạng thái chuẩn hóa (`not_connected`, `pending`, `synced`, `failed`, `cancelled`), lưu trữ `googleEventId`, `googleHtmlLink`, `errorCode`, `errorMessage`, `eventDetails` và timestamp.
+- [x] Cơ chế đảm bảo tính kiên cường (Resilience Guarantee): Booking xác nhận không bao giờ bị rollback khi Google Calendar API gặp sự cố; lỗi được ghi nhận độc lập vào `CalendarEvent`.
+- [x] Endpoint retry thủ công idempotent (`POST /api/calendar/sync/retry`): Cho phép người dùng hoặc Admin thử lại đồng bộ cho các booking bị failed mà không tạo trùng lặp event.
+- [x] Tra cứu & Quản trị đồng bộ:
+  - `GET /api/calendar/status`: Kiểm tra trạng thái kết nối Google của tài khoản hiện tại kèm bảng tổng hợp số lượng đồng bộ.
+  - `POST /api/calendar/disconnect`: Ngắt kết nối và thu hồi token an toàn.
+  - `GET /api/calendar/sync/:bookingId`: Xem lịch sử đồng bộ chi tiết theo booking.
+  - `GET /api/calendar/admin/sync`: Quản trị viên theo dõi toàn bộ log đồng bộ lịch trên hệ thống kèm phân trang và lọc theo trạng thái.
+- [x] Kiểm thử tự động toàn diện (`backend/tests/calendar.test.js`): 28/28 test cases vượt qua 100% (Tổng toàn dự án: 11/11 suites, 225/225 tests PASS).
 
 ## Giai đoạn 10 – Review, Admin, bảo mật và vận hành
 

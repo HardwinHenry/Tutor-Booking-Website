@@ -8,8 +8,12 @@ const notFoundHandler = require('./middlewares/notFound');
 const errorHandler = require('./middlewares/errorHandler');
 const routes = require('./routes');
 const { getHealthStatus } = require('./controllers/health.controller');
+const { initCalendarEventListeners } = require('./events/calendar.listener');
 
 const app = express();
+
+// Initialize event-driven background listeners
+initCalendarEventListeners();
 
 // Security HTTP headers
 app.use(helmet());
