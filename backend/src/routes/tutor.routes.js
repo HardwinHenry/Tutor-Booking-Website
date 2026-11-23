@@ -3,6 +3,7 @@ const { authenticate, optionalAuthenticate, authorize } = require('../middleware
 const { ROLES } = require('../constants/roles');
 const tutorProfileController = require('../controllers/tutorProfile.controller');
 const availabilityController = require('../controllers/availability.controller');
+const reviewController = require('../controllers/review.controller');
 const {
   validateUpdateTutorProfile,
   validateSubmitTutorProfile,
@@ -10,6 +11,7 @@ const {
   validateTutorIdParam,
 } = require('../validators/tutorProfile.validator');
 const { validateGetTutorAvailability } = require('../validators/availability.validator');
+const { validateTutorReviewsQuery } = require('../validators/review.validator');
 
 const router = express.Router();
 
@@ -62,7 +64,15 @@ router.get(
   availabilityController.getTutorAvailability
 );
 
-// 4. Public Tutor Profile View (Optional auth for admin checks)
+// 4. Public Tutor Reviews (Phase 10)
+router.get(
+  '/:id/reviews',
+  optionalAuthenticate,
+  validateTutorReviewsQuery,
+  reviewController.getTutorReviews
+);
+
+// 5. Public Tutor Profile View (Optional auth for admin checks)
 router.get(
   '/:id',
   optionalAuthenticate,
