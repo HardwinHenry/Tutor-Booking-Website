@@ -1,6 +1,7 @@
 const express = require('express');
 const taxonomyController = require('../controllers/taxonomy.controller');
 const tutorProfileController = require('../controllers/tutorProfile.controller');
+const bookingController = require('../controllers/booking.controller');
 const { authenticate, authorize } = require('../middlewares/auth');
 const { ROLES } = require('../constants/roles');
 const {
@@ -13,6 +14,7 @@ const {
   validateTutorApproval,
   validateGetAdminTutors,
 } = require('../validators/tutorProfile.validator');
+const { validateGetBookingsQuery } = require('../validators/booking.validator');
 
 const router = express.Router();
 
@@ -37,5 +39,8 @@ router.patch(
   validateTutorApproval,
   tutorProfileController.updateTutorApproval
 );
+
+// Booking Management Routes (Phase 8)
+router.get('/bookings', validateGetBookingsQuery, bookingController.adminListBookings);
 
 module.exports = router;
