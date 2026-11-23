@@ -991,11 +991,30 @@ Nếu nhóm quyết định `pending` giữ chỗ, phải bổ sung `reserved`, 
 **Đầu ra:** Review API, Admin API, test suite, tài liệu API và deploy guide.  
 **Tiêu chí hoàn thành:** Nghiệp vụ cốt lõi có test; quyền truy cập được kiểm tra; có logging/backup và quy trình triển khai.
 
-**Trạng thái triển khai:** Chưa triển khai (Pending)
-- [ ] Review & Rating System: Chỉ cho phép Learner có booking `completed` đánh giá, tự động tính toán lại `ratingSummary` cho Tutor.
-- [ ] Mở rộng Admin Dashboard: Quản lý người dùng (`/api/admin/users`), khóa/mở tài khoản, giám sát trạng thái đồng bộ Calendar.
-- [ ] Tăng cường bảo mật: Rate limiting chuyên sâu, NoSQL injection protection, input sanitization toàn diện.
-- [ ] Logging, monitoring & MongoDB backup/restore automation cho môi trường production.
+**Trạng thái triển khai:** Đã hoàn thành (Phase 10 Completed)
+- [x] Review & Rating System:
+  - Chỉ cho phép Learner có booking `completed` đánh giá (`POST /api/reviews`), xác minh chặt chẽ tính sở hữu và thời điểm hoàn tất buổi học.
+  - Quy định nghiêm ngặt 1 review / 1 booking (unique index + conflict prevention).
+  - Cho phép gia sư phản hồi công khai (`POST /api/reviews/:id/response`).
+  - Tự động tính toán lại `ratingSummary` (điểm trung bình & số lượng đánh giá) cho TutorProfile mỗi khi có review mới hoặc khi kiểm duyệt review.
+  - API công khai xem đánh giá gia sư (`GET /api/tutors/:id/reviews`) kèm phân tích phân bố sao (1 - 5 sao) và phân trang.
+  - API tra cứu review của học viên (`GET /api/reviews/mine`, `GET /api/reviews/booking/:bookingId`).
+- [x] Mở rộng Admin Dashboard:
+  - Quản lý người dùng toàn diện (`GET /api/admin/users`) với bộ lọc vai trò, trạng thái, tìm kiếm đa trường và thống kê tổng quan.
+  - Xem chi tiết người dùng và số liệu booking (`GET /api/admin/users/:id`).
+  - Khóa/mở khóa/vô hiệu hóa tài khoản (`PATCH /api/admin/users/:id/status`) kèm cơ chế thu hồi refresh token tức thì; ngăn admin tự khóa tài khoản chính mình.
+  - Kiểm duyệt đánh giá (`GET /api/admin/reviews`, `PATCH /api/admin/reviews/:id/visibility`), tự động tính lại điểm gia sư khi ẩn/hiện đánh giá.
+  - Giám sát đồng bộ Google Calendar tập trung (`GET /api/admin/calendar-sync`).
+- [x] Tăng cường bảo mật:
+  - NoSQL Injection Protection: Middleware `noSqlSanitizer` kiểm tra đệ quy và ngăn chặn mọi toán tử truy vấn MongoDB (`$gt`, `$ne`, `$where`, `[$`) trên body, query và URL params.
+  - Input Sanitization & XSS Defense: Middleware `xssSanitizer` bóc tách triệt để các thẻ `<script>` nguy hại khỏi dữ liệu đầu vào.
+  - Rate Limiting phân tầng: `authLimiter` (20 req / 15m), `actionLimiter` (60 req / 15m), `apiLimiter` (300 req / 15m).
+  - Whitelist field updates & RBAC chặt chẽ, chống mass assignment trên tất cả các module.
+- [x] Logging, Monitoring & MongoDB Backup/Restore Automation:
+  - Endpoint `/health` và `/api/health` giám sát chi tiết trạng thái kết nối MongoDB, uptime, bộ nhớ (RSS, Heap), PID, Node runtime.
+  - Script sao lưu tự động MongoDB có cấu trúc JSON (`npm run db:backup`) và script khôi phục (`npm run db:restore`).
+  - Tài liệu vận hành, triển khai production chi tiết tại `docs/DEPLOYMENT_AND_OPERATIONS_GUIDE.md`.
+- [x] Kiểm thử tự động toàn diện (`backend/tests/phase10.test.js`): 29/29 test cases PASS 100% (Toàn dự án: 12/12 suites, 254/254 tests PASS).
 
 # Quy tắc trạng thái và nghiệp vụ
 

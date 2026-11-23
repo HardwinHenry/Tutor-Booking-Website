@@ -40,11 +40,17 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Security middlewares: NoSQL injection protection & XSS input sanitization
+const { apiLimiter } = require('./middlewares/rateLimiter');
+const { noSqlSanitizer, xssSanitizer } = require('./middlewares/sanitizer');
+app.use(noSqlSanitizer);
+app.use(xssSanitizer);
+
 // Root health check (standard cloud probe endpoint)
 app.get('/health', getHealthStatus);
 
-// API Routes
-app.use('/api', routes);
+// API Routes with general rate limiting
+app.use('/api', apiLimiter, routes);
 
 // 404 Not Found Handler
 app.use(notFoundHandler);

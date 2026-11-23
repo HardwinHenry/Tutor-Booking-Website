@@ -9,7 +9,9 @@
     "test": "cross-env NODE_ENV=test jest --runInBand --detectOpenHandles --forceExit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:backup": "node scripts/backup-db.js",
+    "db:restore": "node scripts/restore-db.js"
   },
   "nodemonConfig": {
     "watch": [
