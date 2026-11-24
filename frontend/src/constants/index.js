@@ -43,6 +43,7 @@ export const TUTOR_PROFILE_STATUS = {
 
 // Trạng thái hoàn thành Onboarding
 export const ONBOARDING_STATUS = {
+  NOT_STARTED: 'not_started',
   IN_PROGRESS: 'in_progress',
   COMPLETED: 'completed',
 };

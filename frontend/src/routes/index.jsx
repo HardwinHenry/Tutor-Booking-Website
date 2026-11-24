@@ -17,6 +17,7 @@ import DesignSystemShowcasePage from '../features/common/DesignSystemShowcasePag
 import NotFoundPage from '../features/common/NotFoundPage';
 import UnauthorizedPage from '../features/common/UnauthorizedPage';
 import FeaturePlaceholderPage from '../features/common/FeaturePlaceholderPage';
+import { LearnerQuestionnairePage, TutorQuestionnairePage } from '../features/questionnaire';
 
 export function AppRoutes() {
   return (
@@ -50,16 +51,7 @@ export function AppRoutes() {
         <Route path="learner" element={<DashboardLayout />}>
           <Route index element={<Navigate to="/learner/dashboard" replace />} />
           <Route path="dashboard" element={<LearnerDashboardPage />} />
-          <Route
-            path="questionnaire"
-            element={
-              <FeaturePlaceholderPage
-                title="Khảo sát nhu cầu học tập (28 câu)"
-                stage="Giai đoạn 2"
-                description="Bộ câu hỏi phân loại Q1-Q28, lưu nháp, theo dõi tiến độ và tải lại dữ liệu từ Backend LearnerPreference."
-              />
-            }
-          />
+          <Route path="questionnaire" element={<LearnerQuestionnairePage />} />
           <Route
             path="recommendations"
             element={
@@ -98,16 +90,7 @@ export function AppRoutes() {
         <Route path="tutor" element={<DashboardLayout />}>
           <Route index element={<Navigate to="/tutor/dashboard" replace />} />
           <Route path="dashboard" element={<TutorDashboardPage />} />
-          <Route
-            path="questionnaire"
-            element={
-              <FeaturePlaceholderPage
-                title="Hồ sơ năng lực giảng dạy (28 câu)"
-                stage="Giai đoạn 2"
-                description="Khai báo năng lực giảng dạy Q1-Q28, lưu nháp và gửi hồ sơ để Admin duyệt (POST /api/tutors/profile/submit)."
-              />
-            }
-          />
+          <Route path="questionnaire" element={<TutorQuestionnairePage />} />
           <Route
             path="availability"
             element={
