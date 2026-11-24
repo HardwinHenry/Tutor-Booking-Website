@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
   Sparkles,
@@ -19,7 +19,8 @@ import { learnerService } from '../../services/learner.service';
 import { calculateLearnerProgress, mapBackendToLearnerForm } from '../questionnaire/utils/learnerFormMapper';
 
 export function LearnerDashboardPage() {
-  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const { user, setSurveyStatus } = useAuthStore();
   const [preference, setPreference] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -28,7 +29,14 @@ export function LearnerDashboardPage() {
     learnerService
       .getMyPreference(true)
       .then((data) => {
-        if (isMounted) setPreference(data);
+        if (isMounted) {
+          setPreference(data);
+          const status = data?.completionStatus || 'not_started';
+          setSurveyStatus(status);
+          if (status !== 'completed') {
+            navigate('/learner/questionnaire', { replace: true });
+          }
+        }
       })
       .catch((err) => {
         console.error('Không thể tải nhu cầu học tập:', err);
@@ -40,7 +48,7 @@ export function LearnerDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [navigate, setSurveyStatus]);
 
   const formState = preference ? mapBackendToLearnerForm(preference) : null;
   const progress = formState ? calculateLearnerProgress(formState) : { answered: 0, total: 28, percentage: 0 };

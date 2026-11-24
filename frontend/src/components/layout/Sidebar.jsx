@@ -16,14 +16,18 @@ import {
   Tag,
   LogOut,
   X,
+  Lock,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { ROLES } from '../../constants';
 import { cn } from '../../utils/cn';
+import { toast } from '../feedback/ToastProvider';
 
 export function Sidebar({ isOpen, onClose }) {
-  const { user, logout, isLearner, isTutor, isAdmin } = useAuthStore();
+  const { user, logout, isLearner, isTutor, isAdmin, surveyStatus } = useAuthStore();
   const navigate = useNavigate();
+
+  const isSurveyPending = isLearner() && surveyStatus !== 'completed';
 
   const handleLogout = async () => {
     await logout();
@@ -78,17 +82,47 @@ export function Sidebar({ isOpen, onClose }) {
       {
         title: 'Khu vực Học viên',
         items: [
-          { to: '/learner/dashboard', label: 'Dashboard Học viên', icon: LayoutDashboard },
-          { to: '/learner/questionnaire', label: 'Nhu cầu học tập (28 mục)', icon: ClipboardList },
-          { to: '/learner/recommendations', label: 'Gia sư gợi ý phù hợp', icon: Sparkles },
+          {
+            to: '/learner/dashboard',
+            label: 'Dashboard Học viên',
+            icon: LayoutDashboard,
+            locked: isSurveyPending,
+          },
+          {
+            to: '/learner/questionnaire',
+            label: 'Nhu cầu học tập (28 mục)',
+            icon: ClipboardList,
+            badge: isSurveyPending ? 'Bắt buộc' : null,
+          },
+          {
+            to: '/learner/recommendations',
+            label: 'Gia sư gợi ý phù hợp',
+            icon: Sparkles,
+            locked: isSurveyPending,
+          },
         ],
       },
       {
         title: 'Khám phá & Đặt lịch',
         items: [
-          { to: '/tutors', label: 'Tìm kiếm gia sư', icon: Search },
-          { to: '/learner/bookings', label: 'Buổi học của tôi', icon: CalendarDays },
-          { to: '/learner/calendar', label: 'Kết nối Google Calendar', icon: Calendar },
+          {
+            to: '/tutors',
+            label: 'Tìm kiếm gia sư',
+            icon: Search,
+            locked: isSurveyPending,
+          },
+          {
+            to: '/learner/bookings',
+            label: 'Buổi học của tôi',
+            icon: CalendarDays,
+            locked: isSurveyPending,
+          },
+          {
+            to: '/learner/calendar',
+            label: 'Kết nối Google Calendar',
+            icon: Calendar,
+            locked: isSurveyPending,
+          },
         ],
       },
     ];
@@ -115,7 +149,10 @@ export function Sidebar({ isOpen, onClose }) {
       >
         {/* Brand header */}
         <div className="h-16 px-6 flex items-center justify-between border-b border-slate-100">
-          <NavLink to="/" className="flex items-center space-x-2.5">
+          <NavLink
+            to={isSurveyPending ? '/learner/questionnaire' : '/'}
+            className="flex items-center space-x-2.5"
+          >
             <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white shadow-sm shadow-brand-500/30">
               <GraduationCap className="w-5 h-5" />
             </div>
@@ -155,22 +192,52 @@ export function Sidebar({ isOpen, onClose }) {
               <div className="mt-1 space-y-0.5">
                 {section.items.map((item) => {
                   const Icon = item.icon;
+                  const isLocked = item.locked;
+
                   return (
                     <NavLink
                       key={item.to}
-                      to={item.to}
-                      onClick={onClose}
+                      to={isLocked ? '#' : item.to}
+                      onClick={(e) => {
+                        if (isLocked) {
+                          e.preventDefault();
+                          toast.warning('Vui lòng hoàn thành 28 câu hỏi khảo sát để mở khóa chức năng này.');
+                          return;
+                        }
+                        onClose();
+                      }}
                       className={({ isActive }) =>
                         cn(
-                          'flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors group',
-                          isActive
+                          'flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg transition-colors group select-none',
+                          isLocked
+                            ? 'text-slate-400 hover:bg-slate-50/50 cursor-not-allowed opacity-75'
+                            : isActive
                             ? 'bg-brand-50 text-brand-700'
                             : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                         )
                       }
                     >
-                      <Icon className="w-4 h-4 mr-2.5 shrink-0 transition-colors group-hover:text-brand-600" />
-                      <span className="truncate">{item.label}</span>
+                      <div className="flex items-center min-w-0">
+                        <Icon
+                          className={cn(
+                            'w-4 h-4 mr-2.5 shrink-0 transition-colors',
+                            isLocked
+                              ? 'text-slate-400'
+                              : 'group-hover:text-brand-600'
+                          )}
+                        />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+
+                      {isLocked && (
+                        <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1.5" />
+                      )}
+
+                      {item.badge && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 animate-pulse shrink-0 ml-1.5">
+                          {item.badge}
+                        </span>
+                      )}
                     </NavLink>
                   );
                 })}

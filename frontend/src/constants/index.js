@@ -15,6 +15,7 @@ export const STORAGE_KEYS = {
   THEME: 'tc_theme',
   LEARNER_ONBOARDING_DRAFT: 'tc_learner_draft',
   TUTOR_ONBOARDING_DRAFT: 'tc_tutor_draft',
+  SURVEY_STATUS: 'tc_survey_status',
 };
 
 // Vòng đời AvailabilitySlot (Tutor)

@@ -38,11 +38,14 @@ export function RegisterPage() {
     setIsLoading(true);
     try {
       const data = await register({ name, email, phone, password, role });
-      toast.success('Đăng ký tài khoản thành công!');
       if (role === ROLES.TUTOR) {
-        navigate('/tutor/dashboard');
+        toast.success('Đăng ký tài khoản Gia sư thành công!');
+        navigate('/tutor/dashboard', { replace: true });
       } else {
-        navigate('/learner/dashboard');
+        toast.success(
+          'Đăng ký tài khoản thành công! Vui lòng hoàn thành bộ khảo sát 28 câu hỏi để kích hoạt tài khoản.'
+        );
+        navigate('/learner/questionnaire', { replace: true });
       }
     } catch (err) {
       setError(err.message || 'Đăng ký tài khoản thất bại. Vui lòng kiểm tra lại thông tin.');

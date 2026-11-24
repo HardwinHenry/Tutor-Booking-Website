@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, UserCheck } from 'lucide-react';
+import { Mail, Lock, ArrowRight } from 'lucide-react';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -13,17 +13,23 @@ export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { login, setSession } = useAuthStore();
+  const { login, checkSurveyStatus } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = location.state?.from?.pathname;
 
-  const getRedirectPath = (role) => {
-    if (from && from !== '/login') return from;
+  const getRedirectPath = (role, currentSurveyStatus) => {
     if (role === ROLES.ADMIN) return '/admin/dashboard';
     if (role === ROLES.TUTOR) return '/tutor/dashboard';
-    return '/learner/dashboard';
+
+    // Learner: Check survey status
+    if (currentSurveyStatus === 'completed') {
+      if (from && from !== '/login' && from !== '/learner/questionnaire') return from;
+      return '/learner/dashboard';
+    }
+
+    return '/learner/questionnaire';
   };
 
   const handleSubmit = async (e) => {
@@ -39,37 +45,23 @@ export function LoginPage() {
     try {
       const data = await login({ email, password });
       toast.success('Đăng nhập thành công!');
-      navigate(getRedirectPath(data.user?.role), { replace: true });
+
+      const role = data.user?.role;
+      let status = 'completed';
+
+      if (role === ROLES.LEARNER) {
+        status = await checkSurveyStatus();
+        if (status !== 'completed') {
+          toast.info('Vui lòng hoàn thành bộ khảo sát 28 câu hỏi để sử dụng hệ thống.');
+        }
+      }
+
+      navigate(getRedirectPath(role, status), { replace: true });
     } catch (err) {
       setError(err.message || 'Email hoặc mật khẩu không chính xác');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Mock switch for development and local testing
-  const handleQuickLogin = (role) => {
-    const mockUser = {
-      _id: 'mock-user-id-' + role,
-      name:
-        role === ROLES.ADMIN
-          ? 'Quản trị viên Demo'
-          : role === ROLES.TUTOR
-          ? 'Gia sư Trần Nam'
-          : 'Học viên Mai Anh',
-      email: `${role}@tutorconnect.vn`,
-      role,
-      phone: '0901234567',
-    };
-
-    setSession({
-      user: mockUser,
-      accessToken: 'mock-access-token-' + role,
-      refreshToken: 'mock-refresh-token-' + role,
-    });
-
-    toast.success(`Đã đăng nhập dưới vai trò ${role.toUpperCase()}`);
-    navigate(getRedirectPath(role), { replace: true });
   };
 
   return (
@@ -129,40 +121,6 @@ export function LoginPage() {
           Đăng nhập
         </Button>
       </form>
-
-      {/* Development Quick Role Switcher */}
-      <div className="pt-4 border-t border-slate-100">
-        <div className="flex items-center gap-1.5 justify-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-          <UserCheck className="w-3.5 h-3.5" />
-          <span>Chế độ kiểm thử nhanh vai trò</span>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleQuickLogin(ROLES.LEARNER)}
-            className="text-[11px] py-1"
-          >
-            Learner
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleQuickLogin(ROLES.TUTOR)}
-            className="text-[11px] py-1"
-          >
-            Tutor
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleQuickLogin(ROLES.ADMIN)}
-            className="text-[11px] py-1"
-          >
-            Admin
-          </Button>
-        </div>
-      </div>
 
       <p className="text-center text-xs text-slate-500">
         Chưa có tài khoản?{' '}

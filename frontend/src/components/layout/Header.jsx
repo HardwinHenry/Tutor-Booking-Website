@@ -16,8 +16,11 @@ import Badge from '../common/Badge';
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout, isLearner, isTutor, isAdmin } = useAuthStore();
+  const { user, isAuthenticated, logout, isLearner, isTutor, isAdmin, surveyStatus } =
+    useAuthStore();
   const navigate = useNavigate();
+
+  const isSurveyPending = isLearner() && surveyStatus !== 'completed';
 
   const handleLogout = async () => {
     await logout();
@@ -27,6 +30,7 @@ export function Header() {
   const getDashboardLink = () => {
     if (isAdmin()) return '/admin/dashboard';
     if (isTutor()) return '/tutor/dashboard';
+    if (isSurveyPending) return '/learner/questionnaire';
     return '/learner/dashboard';
   };
 
@@ -35,7 +39,10 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2.5">
+          <Link
+            to={isSurveyPending ? '/learner/questionnaire' : '/'}
+            className="flex items-center space-x-2.5"
+          >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
               <GraduationCap className="w-6 h-6" />
             </div>
@@ -48,30 +55,37 @@ export function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link
-              to="/tutors"
-              className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors flex items-center gap-1.5"
-            >
-              <Search className="w-4 h-4" />
-              <span>Tìm gia sư</span>
-            </Link>
-            <Link
-              to="/design-system"
-              className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors flex items-center gap-1.5"
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>Design System</span>
-            </Link>
-          </nav>
+          {!isSurveyPending && (
+            <nav className="hidden md:flex items-center space-x-8">
+              <Link
+                to="/tutors"
+                className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors flex items-center gap-1.5"
+              >
+                <Search className="w-4 h-4" />
+                <span>Tìm gia sư</span>
+              </Link>
+              <Link
+                to="/design-system"
+                className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors flex items-center gap-1.5"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Design System</span>
+              </Link>
+            </nav>
+          )}
 
           {/* Desktop Auth Controls */}
           <div className="hidden md:flex items-center space-x-3">
             {isAuthenticated ? (
               <div className="flex items-center space-x-3">
                 <Link to={getDashboardLink()}>
-                  <Button variant="outline" size="sm" iconLeft={LayoutDashboard}>
-                    Dashboard
+                  <Button
+                    variant={isSurveyPending ? 'primary' : 'outline'}
+                    size="sm"
+                    iconLeft={LayoutDashboard}
+                    className={isSurveyPending ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}
+                  >
+                    {isSurveyPending ? 'Khảo sát đầu vào (Bắt buộc)' : 'Dashboard'}
                   </Button>
                 </Link>
                 <div className="flex items-center pl-2 border-l border-slate-200 space-x-2">

@@ -80,7 +80,7 @@ export function QuestionStepper({
                       : 'bg-slate-100 text-slate-600'
                   }`}
                 >
-                  Phần {idx + 1}
+                  {section.badge || `Phần ${idx + 1}`}
                 </span>
                 {isCompleted && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
               </div>

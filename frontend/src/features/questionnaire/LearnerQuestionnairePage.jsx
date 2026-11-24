@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
   Info,
+  ShieldAlert,
+  ArrowRight,
 } from 'lucide-react';
 import { questionnaireService } from '../../services/questionnaire.service';
 import { learnerService } from '../../services/learner.service';
@@ -20,13 +22,19 @@ import SingleChoiceField from './components/SingleChoiceField';
 import MultipleChoiceField from './components/MultipleChoiceField';
 import CascadingTaxonomySelector from './components/CascadingTaxonomySelector';
 import QuestionnaireActions from './components/QuestionnaireActions';
+import QuestionnaireReviewSummary from './components/QuestionnaireReviewSummary';
 import LoadingState from '../../components/feedback/LoadingState';
 import Textarea from '../../components/common/Textarea';
 import Input from '../../components/common/Input';
 import { toast } from '../../components/feedback/ToastProvider';
+import { useAuthStore } from '../../store/useAuthStore';
+import { storage } from '../../utils/storage';
 
 export function LearnerQuestionnairePage() {
   const navigate = useNavigate();
+  const { user, setSurveyStatus } = useAuthStore();
+
+  const draftKey = `tc_learner_draft_${user?._id || user?.id || 'learner'}`;
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -55,6 +63,21 @@ export function LearnerQuestionnairePage() {
   const [supportTypes, setSupportTypes] = useState([]);
   const [progressTracking, setProgressTracking] = useState([]);
 
+  // Save local draft to prevent data loss on reload / disconnection
+  const saveLocalDraft = useCallback(
+    (formData) => {
+      try {
+        storage.set(draftKey, {
+          form: formData,
+          savedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('Lỗi khi lưu nháp localStorage:', err);
+      }
+    },
+    [draftKey]
+  );
+
   // Fetch questionnaire schema and user's saved preference
   useEffect(() => {
     let isMounted = true;
@@ -70,7 +93,7 @@ export function LearnerQuestionnairePage() {
 
         if (!isMounted) return;
 
-        setRawQuestions(qRes.questions || []);
+        setRawQuestions(qRes?.questions || []);
 
         // Filter root taxonomies
         setCategories(allTaxonomies.filter((t) => t.type === 'category' && !t.parentId));
@@ -88,12 +111,37 @@ export function LearnerQuestionnairePage() {
         setSupportTypes(allTaxonomies.filter((t) => t.type === 'support_type'));
         setProgressTracking(allTaxonomies.filter((t) => t.type === 'progress_tracking'));
 
-        // Load existing preference
-        if (pref) {
-          setForm(mapBackendToLearnerForm(pref));
-          setCompletionStatus(pref.completionStatus || 'not_started');
-          if (pref.updatedAt) {
-            setLastSavedAt(new Date(pref.updatedAt));
+        // Load existing preference or restore from local draft
+        const localDraft = storage.get(draftKey, null);
+        const backendStatus = pref?.completionStatus || 'not_started';
+        setCompletionStatus(backendStatus);
+
+        if (backendStatus === 'completed') {
+          // Already completed: use backend data
+          if (pref) {
+            setForm(mapBackendToLearnerForm(pref));
+            if (pref.updatedAt) setLastSavedAt(new Date(pref.updatedAt));
+          }
+        } else {
+          // Uncompleted: check if local draft has more answers
+          const backendForm = pref ? mapBackendToLearnerForm(pref) : getInitialLearnerFormState();
+          const localForm = localDraft?.form;
+
+          if (localForm) {
+            const localProgress = calculateLearnerProgress(localForm);
+            const backendProgress = calculateLearnerProgress(backendForm);
+
+            if (localProgress.answered >= backendProgress.answered && localProgress.answered > 0) {
+              setForm(localForm);
+              if (localDraft.savedAt) setLastSavedAt(new Date(localDraft.savedAt));
+              toast.info('Đã tự động khôi phục câu trả lời bạn đã lưu tạm trước đó.');
+            } else {
+              setForm(backendForm);
+              if (pref?.updatedAt) setLastSavedAt(new Date(pref.updatedAt));
+            }
+          } else {
+            setForm(backendForm);
+            if (pref?.updatedAt) setLastSavedAt(new Date(pref.updatedAt));
           }
         }
       } catch (err) {
@@ -109,7 +157,7 @@ export function LearnerQuestionnairePage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [draftKey]);
 
   // Determine if offline questions are required based on selected modes
   const isOfflineSelected = useMemo(() => {
@@ -126,6 +174,37 @@ export function LearnerQuestionnairePage() {
   const { answered, total, percentage } = useMemo(() => {
     return calculateLearnerProgress(form, isOfflineSelected);
   }, [form, isOfflineSelected]);
+
+  // Field updater with auto local saving and error clearing
+  const updateField = (section, field, value) => {
+    setForm((prev) => {
+      const next = {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [field]: value,
+        },
+      };
+      saveLocalDraft(next);
+      return next;
+    });
+
+    if (errors[field]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
+
+  const updateAdditionalNote = (text) => {
+    setForm((prev) => {
+      const next = { ...prev, additionalNote: text };
+      saveLocalDraft(next);
+      return next;
+    });
+  };
 
   // Fixed question options
   const targetDurationOptions = [
@@ -200,173 +279,295 @@ export function LearnerQuestionnairePage() {
     { id: 'required', label: 'Bắt buộc phải có bằng cấp / chứng chỉ chuyên môn' },
   ];
 
-  // Sections configuration
-  const sections = [
-    {
-      id: 'domain_needs',
-      title: 'Lĩnh vực & Mục tiêu',
-      range: 'Q1 – Q8',
-      isCompleted:
-        !!form.learning.categoryId &&
-        form.learning.subjectIds.length > 0 &&
-        form.learning.topicIds.length > 0 &&
-        form.learning.purposes.length > 0 &&
-        !!form.learning.currentLevel &&
-        !!form.learning.targetLevel &&
-        !!form.learning.targetDuration,
-    },
-    {
-      id: 'learning_style',
-      title: 'Phương pháp & Phong cách',
-      range: 'Q9 – Q14',
-      isCompleted:
-        form.learningStyle.methods.length > 0 &&
-        !!form.learningStyle.pace &&
-        !!form.learningStyle.classFormat &&
-        form.learningStyle.preferredTutorStyles.length > 0 &&
-        form.learningStyle.materials.length > 0 &&
-        !!form.learningStyle.interactionLevel,
-    },
-    {
-      id: 'schedule',
-      title: 'Thời gian học tập',
-      range: 'Q15 – Q18',
-      isCompleted:
-        form.schedulePreferences.timeBands.length > 0 &&
-        form.schedulePreferences.weekdays.length > 0 &&
-        !!form.schedulePreferences.sessionsPerWeek &&
-        form.schedulePreferences.durationMinutes.length > 0,
-    },
-    {
-      id: 'conditions_tutor',
-      title: 'Hình thức & Tiêu chuẩn',
-      range: 'Q19 – Q24',
-      isCompleted:
-        form.constraints.modes.length > 0 &&
-        (!isOfflineSelected || form.constraints.offlineLocations.length > 0) &&
-        !!form.constraints.budgetRangeId &&
-        form.tutorRequirements.selectionPriorities.length > 0 &&
-        !!form.tutorRequirements.experienceRange &&
-        !!form.tutorRequirements.certificateRequirement,
-    },
-    {
-      id: 'support_notes',
-      title: 'Hỗ trợ & Cá nhân hóa',
-      range: 'Q25 – Q28',
-      isCompleted:
-        form.supportNeeds.difficulties.length > 0 &&
-        form.supportNeeds.desiredSupport.length > 0 &&
-        !!form.supportNeeds.progressTracking,
-    },
-  ];
+  // Sections configuration including Step 6: Confirmation Review
+  const sections = useMemo(
+    () => [
+      {
+        id: 'domain_needs',
+        title: 'Lĩnh vực & Mục tiêu',
+        range: 'Q1 – Q8',
+        isCompleted:
+          !!form.learning.categoryId &&
+          form.learning.subjectIds.length > 0 &&
+          form.learning.topicIds.length > 0 &&
+          form.learning.purposes.length > 0 &&
+          !!form.learning.currentLevel &&
+          !!form.learning.targetLevel &&
+          !!form.learning.targetDuration,
+      },
+      {
+        id: 'learning_style',
+        title: 'Phương pháp & Phong cách',
+        range: 'Q9 – Q14',
+        isCompleted:
+          form.learningStyle.methods.length > 0 &&
+          !!form.learningStyle.pace &&
+          !!form.learningStyle.classFormat &&
+          form.learningStyle.preferredTutorStyles.length > 0 &&
+          form.learningStyle.materials.length > 0 &&
+          !!form.learningStyle.interactionLevel,
+      },
+      {
+        id: 'schedule',
+        title: 'Thời gian học tập',
+        range: 'Q15 – Q18',
+        isCompleted:
+          form.schedulePreferences.timeBands.length > 0 &&
+          form.schedulePreferences.weekdays.length > 0 &&
+          !!form.schedulePreferences.sessionsPerWeek &&
+          form.schedulePreferences.durationMinutes.length > 0,
+      },
+      {
+        id: 'conditions_tutor',
+        title: 'Hình thức & Tiêu chuẩn',
+        range: 'Q19 – Q24',
+        isCompleted:
+          form.constraints.modes.length > 0 &&
+          (!isOfflineSelected || form.constraints.offlineLocations.length > 0) &&
+          !!form.constraints.budgetRangeId &&
+          form.tutorRequirements.selectionPriorities.length > 0 &&
+          !!form.tutorRequirements.experienceRange &&
+          !!form.tutorRequirements.certificateRequirement,
+      },
+      {
+        id: 'support_notes',
+        title: 'Hỗ trợ & Cá nhân hóa',
+        range: 'Q25 – Q28',
+        isCompleted:
+          form.supportNeeds.difficulties.length > 0 &&
+          form.supportNeeds.desiredSupport.length > 0 &&
+          !!form.supportNeeds.progressTracking,
+      },
+      {
+        id: 'review_confirm',
+        title: 'Xác nhận & Hoàn tất',
+        range: 'Kiểm tra',
+        badge: 'Xác nhận',
+        isCompleted:
+          !!form.learning.categoryId &&
+          form.learning.subjectIds.length > 0 &&
+          form.learning.topicIds.length > 0 &&
+          form.learning.purposes.length > 0 &&
+          !!form.learning.currentLevel &&
+          !!form.learning.targetLevel &&
+          !!form.learning.targetDuration &&
+          form.learningStyle.methods.length > 0 &&
+          !!form.learningStyle.pace &&
+          !!form.learningStyle.classFormat &&
+          form.learningStyle.preferredTutorStyles.length > 0 &&
+          form.learningStyle.materials.length > 0 &&
+          !!form.learningStyle.interactionLevel &&
+          form.schedulePreferences.timeBands.length > 0 &&
+          form.schedulePreferences.weekdays.length > 0 &&
+          !!form.schedulePreferences.sessionsPerWeek &&
+          form.schedulePreferences.durationMinutes.length > 0 &&
+          form.constraints.modes.length > 0 &&
+          (!isOfflineSelected || form.constraints.offlineLocations.length > 0) &&
+          !!form.constraints.budgetRangeId &&
+          form.tutorRequirements.selectionPriorities.length > 0 &&
+          !!form.tutorRequirements.experienceRange &&
+          !!form.tutorRequirements.certificateRequirement &&
+          form.supportNeeds.difficulties.length > 0 &&
+          form.supportNeeds.desiredSupport.length > 0 &&
+          !!form.supportNeeds.progressTracking,
+      },
+    ],
+    [form, isOfflineSelected]
+  );
 
-  // Save Draft (Partial update - non blocking)
-  const handleSaveDraft = async () => {
-    setIsSavingDraft(true);
-    try {
-      const updated = await learnerService.updateMyPreference(form);
-      setLastSavedAt(new Date());
-      setCompletionStatus(updated?.completionStatus || 'in_progress');
-      toast.success('Đã lưu nháp tiến độ thành công!');
-    } catch (err) {
-      toast.error(err.message || 'Không thể lưu bản nháp. Vui lòng kiểm tra lại kết nối.');
-    } finally {
-      setIsSavingDraft(false);
-    }
-  };
-
-  // Client validation before full submit
-  const validateForSubmit = () => {
+  // Per-section validation
+  const validateSection = (sectionIndex) => {
     const errs = {};
 
-    // Section 1
-    if (!form.learning.categoryId) errs.categoryId = 'Vui lòng chọn 1 lĩnh vực chính';
-    if (!form.learning.subjectIds.length) errs.subjectIds = 'Vui lòng chọn ít nhất 1 môn học';
-    if (!form.learning.topicIds.length) errs.topicIds = 'Vui lòng chọn ít nhất 1 chuyên môn sâu';
-    if (!form.learning.purposes.length) errs.purposes = 'Vui lòng chọn mục đích học tập';
-    if (!form.learning.currentLevel) errs.currentLevel = 'Vui lòng chọn trình độ hiện tại của bạn';
-    if (!form.learning.targetLevel) errs.targetLevel = 'Vui lòng chọn trình độ mục tiêu';
-    if (!form.learning.targetDuration) errs.targetDuration = 'Vui lòng chọn thời gian kỳ vọng đạt mục tiêu';
-
-    // Section 2
-    if (!form.learningStyle.methods.length) errs.methods = 'Vui lòng chọn phương pháp học yêu thích';
-    if (!form.learningStyle.pace) errs.pace = 'Vui lòng chọn tốc độ học phù hợp';
-    if (!form.learningStyle.classFormat) errs.classFormat = 'Vui lòng chọn hình thức lớp học';
-    if (!form.learningStyle.preferredTutorStyles.length) errs.preferredTutorStyles = 'Vui lòng chọn phong cách gia sư kỳ vọng';
-    if (!form.learningStyle.materials.length) errs.materials = 'Vui lòng chọn tài liệu học tập yêu thích';
-    if (!form.learningStyle.interactionLevel) errs.interactionLevel = 'Vui lòng chọn mức độ tương tác mong muốn';
-
-    // Section 3
-    if (!form.schedulePreferences.timeBands.length) errs.timeBands = 'Vui lòng chọn khung giờ bạn có thể học';
-    if (!form.schedulePreferences.weekdays.length) errs.weekdays = 'Vui lòng chọn các ngày trong tuần';
-    if (!form.schedulePreferences.sessionsPerWeek) errs.sessionsPerWeek = 'Vui lòng chọn số buổi học mỗi tuần';
-    if (!form.schedulePreferences.durationMinutes.length) errs.durationMinutes = 'Vui lòng chọn thời lượng mỗi buổi';
-
-    // Section 4
-    if (!form.constraints.modes.length) errs.modes = 'Vui lòng chọn hình thức học';
-    if (isOfflineSelected && !form.constraints.offlineLocations.length) {
-      errs.offlineLocations = 'Vì bạn chọn hình thức Offline/Kết hợp, vui lòng chọn địa điểm học Offline';
+    if (sectionIndex === 0) {
+      if (!form.learning.categoryId) errs.categoryId = 'Vui lòng chọn 1 lĩnh vực chính';
+      if (!form.learning.subjectIds.length) errs.subjectIds = 'Vui lòng chọn ít nhất 1 môn học';
+      if (!form.learning.topicIds.length) errs.topicIds = 'Vui lòng chọn ít nhất 1 chuyên môn sâu';
+      if (!form.learning.purposes.length) errs.purposes = 'Vui lòng chọn mục đích học tập';
+      if (!form.learning.currentLevel) errs.currentLevel = 'Vui lòng chọn trình độ hiện tại của bạn';
+      if (!form.learning.targetLevel) errs.targetLevel = 'Vui lòng chọn trình độ mục tiêu';
+      if (!form.learning.targetDuration) errs.targetDuration = 'Vui lòng chọn thời gian kỳ vọng đạt mục tiêu';
+    } else if (sectionIndex === 1) {
+      if (!form.learningStyle.methods.length) errs.methods = 'Vui lòng chọn phương pháp học yêu thích';
+      if (!form.learningStyle.pace) errs.pace = 'Vui lòng chọn tốc độ học phù hợp';
+      if (!form.learningStyle.classFormat) errs.classFormat = 'Vui lòng chọn hình thức lớp học';
+      if (!form.learningStyle.preferredTutorStyles.length) errs.preferredTutorStyles = 'Vui lòng chọn phong cách gia sư kỳ vọng';
+      if (!form.learningStyle.materials.length) errs.materials = 'Vui lòng chọn tài liệu học tập yêu thích';
+      if (!form.learningStyle.interactionLevel) errs.interactionLevel = 'Vui lòng chọn mức độ tương tác mong muốn';
+    } else if (sectionIndex === 2) {
+      if (!form.schedulePreferences.timeBands.length) errs.timeBands = 'Vui lòng chọn khung giờ bạn có thể học';
+      if (!form.schedulePreferences.weekdays.length) errs.weekdays = 'Vui lòng chọn các ngày trong tuần';
+      if (!form.schedulePreferences.sessionsPerWeek) errs.sessionsPerWeek = 'Vui lòng chọn số buổi học mỗi tuần';
+      if (!form.schedulePreferences.durationMinutes.length) errs.durationMinutes = 'Vui lòng chọn thời lượng mỗi buổi';
+    } else if (sectionIndex === 3) {
+      if (!form.constraints.modes.length) errs.modes = 'Vui lòng chọn hình thức học';
+      if (isOfflineSelected && !form.constraints.offlineLocations.length) {
+        errs.offlineLocations = 'Vì bạn chọn hình thức Offline/Kết hợp, vui lòng chọn địa điểm học Offline';
+      }
+      if (!form.constraints.budgetRangeId) errs.budgetRangeId = 'Vui lòng chọn mức ngân sách dự kiến';
+      if (!form.tutorRequirements.selectionPriorities.length) errs.selectionPriorities = 'Vui lòng chọn yếu tố ưu tiên khi chọn gia sư';
+      if (!form.tutorRequirements.experienceRange) errs.experienceRange = 'Vui lòng chọn yêu cầu số năm kinh nghiệm';
+      if (!form.tutorRequirements.certificateRequirement) errs.certificateRequirement = 'Vui lòng chọn yêu cầu chứng chỉ';
+    } else if (sectionIndex === 4) {
+      if (!form.supportNeeds.difficulties.length) errs.difficulties = 'Vui lòng chọn khó khăn bạn gặp phải';
+      if (!form.supportNeeds.desiredSupport.length) errs.desiredSupport = 'Vui lòng chọn hoạt động bạn cần gia sư hỗ trợ';
+      if (!form.supportNeeds.progressTracking) errs.progressTracking = 'Vui lòng chọn cách theo dõi tiến độ';
     }
-    if (!form.constraints.budgetRangeId) errs.budgetRangeId = 'Vui lòng chọn mức ngân sách dự kiến';
-    if (!form.tutorRequirements.selectionPriorities.length) errs.selectionPriorities = 'Vui lòng chọn yếu tố ưu tiên khi chọn gia sư';
-    if (!form.tutorRequirements.experienceRange) errs.experienceRange = 'Vui lòng chọn yêu cầu số năm kinh nghiệm';
-    if (!form.tutorRequirements.certificateRequirement) errs.certificateRequirement = 'Vui lòng chọn yêu cầu chứng chỉ';
-
-    // Section 5
-    if (!form.supportNeeds.difficulties.length) errs.difficulties = 'Vui lòng chọn khó khăn bạn gặp phải';
-    if (!form.supportNeeds.desiredSupport.length) errs.desiredSupport = 'Vui lòng chọn hoạt động bạn cần gia sư hỗ trợ';
-    if (!form.supportNeeds.progressTracking) errs.progressTracking = 'Vui lòng chọn cách theo dõi tiến độ';
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
+  // Find all missing required questions across all sections
+  const getMissingRequiredQuestions = () => {
+    const missing = [];
+    if (!form.learning.categoryId) missing.push({ id: 'Q1', title: 'Lĩnh vực chính', sectionIndex: 0 });
+    if (!form.learning.subjectIds.length) missing.push({ id: 'Q2', title: 'Môn học', sectionIndex: 0 });
+    if (!form.learning.topicIds.length) missing.push({ id: 'Q3', title: 'Chuyên môn sâu', sectionIndex: 0 });
+    if (!form.learning.purposes.length) missing.push({ id: 'Q4', title: 'Mục đích học tập', sectionIndex: 0 });
+    if (!form.learning.currentLevel) missing.push({ id: 'Q5', title: 'Trình độ hiện tại', sectionIndex: 0 });
+    if (!form.learning.targetLevel) missing.push({ id: 'Q6', title: 'Trình độ mong muốn', sectionIndex: 0 });
+    if (!form.learning.targetDuration) missing.push({ id: 'Q8', title: 'Thời gian kỳ vọng', sectionIndex: 0 });
+
+    if (!form.learningStyle.methods.length) missing.push({ id: 'Q9', title: 'Phương pháp học tập', sectionIndex: 1 });
+    if (!form.learningStyle.pace) missing.push({ id: 'Q10', title: 'Tốc độ học tập', sectionIndex: 1 });
+    if (!form.learningStyle.classFormat) missing.push({ id: 'Q11', title: 'Hình thức lớp học', sectionIndex: 1 });
+    if (!form.learningStyle.preferredTutorStyles.length) missing.push({ id: 'Q12', title: 'Phong cách gia sư', sectionIndex: 1 });
+    if (!form.learningStyle.materials.length) missing.push({ id: 'Q13', title: 'Tài liệu học tập', sectionIndex: 1 });
+    if (!form.learningStyle.interactionLevel) missing.push({ id: 'Q14', title: 'Mức độ tương tác', sectionIndex: 1 });
+
+    if (!form.schedulePreferences.timeBands.length) missing.push({ id: 'Q15', title: 'Khung giờ rảnh', sectionIndex: 2 });
+    if (!form.schedulePreferences.weekdays.length) missing.push({ id: 'Q16', title: 'Các ngày trong tuần', sectionIndex: 2 });
+    if (!form.schedulePreferences.sessionsPerWeek) missing.push({ id: 'Q17', title: 'Số buổi mỗi tuần', sectionIndex: 2 });
+    if (!form.schedulePreferences.durationMinutes.length) missing.push({ id: 'Q18', title: 'Thời lượng mỗi buổi', sectionIndex: 2 });
+
+    if (!form.constraints.modes.length) missing.push({ id: 'Q19', title: 'Hình thức học', sectionIndex: 3 });
+    if (isOfflineSelected && !form.constraints.offlineLocations.length) {
+      missing.push({ id: 'Q20', title: 'Địa điểm học Offline', sectionIndex: 3 });
+    }
+    if (!form.constraints.budgetRangeId) missing.push({ id: 'Q21', title: 'Mức ngân sách dự kiến', sectionIndex: 3 });
+    if (!form.tutorRequirements.selectionPriorities.length) missing.push({ id: 'Q22', title: 'Tiêu chuẩn ưu tiên', sectionIndex: 3 });
+    if (!form.tutorRequirements.experienceRange) missing.push({ id: 'Q23', title: 'Kinh nghiệm gia sư', sectionIndex: 3 });
+    if (!form.tutorRequirements.certificateRequirement) missing.push({ id: 'Q24', title: 'Yêu cầu chứng chỉ', sectionIndex: 3 });
+
+    if (!form.supportNeeds.difficulties.length) missing.push({ id: 'Q25', title: 'Khó khăn khi học', sectionIndex: 4 });
+    if (!form.supportNeeds.desiredSupport.length) missing.push({ id: 'Q26', title: 'Hoạt động cần hỗ trợ', sectionIndex: 4 });
+    if (!form.supportNeeds.progressTracking) missing.push({ id: 'Q27', title: 'Cách theo dõi tiến độ', sectionIndex: 4 });
+
+    return missing;
+  };
+
+  const missingQuestions = getMissingRequiredQuestions();
+  const isAllValid = missingQuestions.length === 0;
+
+  // Handle "Tiếp theo" with validation
+  const handleNext = async () => {
+    if (currentSectionIndex < 5) {
+      const isValid = validateSection(currentSectionIndex);
+      if (!isValid) {
+        toast.warning('Vui lòng trả lời các câu hỏi bắt buộc trước khi chuyển sang phần tiếp theo');
+        window.scrollTo({ top: 180, behavior: 'smooth' });
+        return;
+      }
+
+      // Save draft on section change
+      saveLocalDraft(form);
+      learnerService.updateMyPreference(form).catch(() => {});
+
+      setCurrentSectionIndex((prev) => Math.min(sections.length - 1, prev + 1));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Handle "Câu trước"
+  const handlePrevious = () => {
+    setCurrentSectionIndex((prev) => Math.max(0, prev - 1));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Save Draft manually
+  const handleSaveDraft = async () => {
+    setIsSavingDraft(true);
+    saveLocalDraft(form);
+    try {
+      const updated = await learnerService.updateMyPreference(form);
+      setLastSavedAt(new Date());
+      setCompletionStatus(updated?.completionStatus || 'in_progress');
+      toast.success('Đã lưu tạm câu trả lời thành công!');
+    } catch (err) {
+      toast.warning('Đã lưu tạm trên thiết bị. Hệ thống sẽ đồng bộ khi có kết nối mạng ổn định.');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
   // Submit complete questionnaire
   const handleSubmit = async () => {
-    if (!validateForSubmit()) {
-      toast.error('Vui lòng hoàn thành đầy đủ các câu hỏi bắt buộc trước khi nộp');
+    const missing = getMissingRequiredQuestions();
+    if (missing.length > 0) {
+      toast.error(`Còn ${missing.length} câu hỏi bắt buộc chưa hoàn thành. Vui lòng kiểm tra lại.`);
+      setCurrentSectionIndex(missing[0].sectionIndex);
+      validateSection(missing[0].sectionIndex);
+      window.scrollTo({ top: 180, behavior: 'smooth' });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const res = await learnerService.completeMyPreference(form);
+      await learnerService.completeMyPreference(form);
+      storage.remove(draftKey);
       setCompletionStatus('completed');
-      toast.success('Chúc mừng! Bạn đã hoàn tất khảo sát nhu cầu học tập 28 câu 🎉');
-      navigate('/learner/dashboard');
+      setSurveyStatus('completed');
+
+      toast.success('Chúc mừng! Bạn đã hoàn tất khảo sát hồ sơ học tập 28 câu 🎉');
+      navigate('/learner/dashboard', { replace: true });
     } catch (err) {
-      toast.error(err.message || 'Không thể hoàn tất khảo sát. Vui lòng kiểm tra lại các trường.');
+      toast.error(err.message || 'Không thể hoàn tất khảo sát. Vui lòng kiểm tra lại kết nối.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (isLoading) {
-    return <LoadingState fullPage message="Đang tải dữ liệu bộ câu hỏi 28 mục..." />;
+    return <LoadingState fullPage message="Đang tải dữ liệu bộ câu hỏi khảo sát 28 mục..." />;
   }
 
+  const isSurveyPending = completionStatus !== 'completed';
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+    <div className="max-w-4xl mx-auto space-y-6 pb-16">
       {/* Header Info */}
       <div className="space-y-2">
         <div className="flex items-center space-x-2 text-xs font-semibold text-brand-600 uppercase tracking-wider">
           <Sparkles className="w-4 h-4" />
-          <span>Khảo sát nhu cầu học tập cá nhân</span>
+          <span>Khảo sát đầu vào dành cho học viên</span>
         </div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-          Hồ sơ học tập & Tiêu chí gia sư (28 câu)
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          Khám phá hồ sơ học tập của bạn
         </h1>
-        <p className="text-xs text-slate-500 leading-relaxed max-w-2xl">
-          Bộ khảo sát chuẩn hóa 28 câu giúp thuật toán Content-based Filtering phân tích năng lực và gợi ý những gia sư có chuyên môn, phong cách và khung giờ phù hợp nhất với bạn.
+        <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-2xl">
+          Bộ khảo sát chuẩn hóa 28 câu hỏi giúp hệ thống phân tích năng lực, mục tiêu và phong cách học tập của bạn, từ đó đề xuất những gia sư phù hợp nhất.
         </p>
       </div>
 
-      {/* Completion Banner */}
-      {completionStatus === 'completed' && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start space-x-3 text-xs text-emerald-800">
+      {/* Mandatory Notification Banner if Survey Not Completed */}
+      {isSurveyPending ? (
+        <div className="p-4 bg-amber-50/90 border border-amber-200/90 rounded-2xl flex items-start space-x-3 text-xs text-amber-900 shadow-xs">
+          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-bold text-amber-950 text-sm">
+              Khảo sát bắt buộc sau khi đăng ký tài khoản
+            </p>
+            <p className="text-amber-800 leading-relaxed">
+              Bạn cần hoàn thành đầy đủ 28 câu hỏi khảo sát dưới đây để hệ thống kích hoạt hồ sơ học tập và mở khóa quyền truy cập vào trang chủ cùng các tính năng bên trong. Dữ liệu này đảm bảo thuật toán gợi ý gia sư chính xác và hiệu quả nhất cho bạn.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start space-x-3 text-xs text-emerald-800 shadow-xs">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-emerald-900">Hồ sơ khảo sát của bạn đã hoàn tất!</p>
+            <p className="font-bold text-emerald-900 text-sm">Hồ sơ khảo sát của bạn đã hoàn tất!</p>
             <p className="mt-0.5 text-emerald-700">
               Bạn có thể cập nhật lại các tiêu chí bất cứ lúc nào. Các thay đổi sẽ được tự động đồng bộ hóa với hệ thống gợi ý gia sư.
             </p>
@@ -378,7 +579,14 @@ export function LearnerQuestionnairePage() {
       <QuestionStepper
         sections={sections}
         currentSectionIndex={currentSectionIndex}
-        onSelectSection={setCurrentSectionIndex}
+        onSelectSection={(targetIdx) => {
+          if (targetIdx <= currentSectionIndex || validateSection(currentSectionIndex)) {
+            setCurrentSectionIndex(targetIdx);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            toast.warning('Vui lòng hoàn thành các câu hỏi bắt buộc ở phần hiện tại trước khi chuyển bước');
+          }
+        }}
         progressPercentage={percentage}
         answeredCount={answered}
         totalQuestions={total}
@@ -393,7 +601,7 @@ export function LearnerQuestionnairePage() {
           <div className="space-y-5 animate-fadeIn">
             <div className="p-4 bg-brand-50/40 border border-brand-100 rounded-2xl">
               <h2 className="text-sm font-bold text-brand-900">
-                Phần 1: Lĩnh vực, môn học & Mục tiêu học tập
+                Phần 1: Lĩnh vực, môn học & Mục tiêu học tập (Q1 – Q8)
               </h2>
               <p className="text-xs text-brand-700/80 mt-0.5">
                 Xác định môn học bạn cần trau dồi và mục tiêu cụ thể bạn hướng tới.
@@ -406,24 +614,9 @@ export function LearnerQuestionnairePage() {
               selectedCategoryId={form.learning.categoryId}
               selectedSubjectIds={form.learning.subjectIds}
               selectedTopicIds={form.learning.topicIds}
-              onCategoryChange={(catId) =>
-                setForm((prev) => ({
-                  ...prev,
-                  learning: { ...prev.learning, categoryId: catId },
-                }))
-              }
-              onSubjectsChange={(subIds) =>
-                setForm((prev) => ({
-                  ...prev,
-                  learning: { ...prev.learning, subjectIds: subIds },
-                }))
-              }
-              onTopicsChange={(topIds) =>
-                setForm((prev) => ({
-                  ...prev,
-                  learning: { ...prev.learning, topicIds: topIds },
-                }))
-              }
+              onCategoryChange={(catId) => updateField('learning', 'categoryId', catId)}
+              onSubjectsChange={(subIds) => updateField('learning', 'subjectIds', subIds)}
+              onTopicsChange={(topIds) => updateField('learning', 'topicIds', topIds)}
               errors={errors}
               q1Meta={{
                 questionId: 'Q1',
@@ -453,12 +646,7 @@ export function LearnerQuestionnairePage() {
               <MultipleChoiceField
                 options={purposes}
                 value={form.learning.purposes}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learning: { ...prev.learning, purposes: val },
-                  }))
-                }
+                onChange={(val) => updateField('learning', 'purposes', val)}
               />
             </QuestionCard>
 
@@ -473,12 +661,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={levels}
                 value={form.learning.currentLevel}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learning: { ...prev.learning, currentLevel: val },
-                  }))
-                }
+                onChange={(val) => updateField('learning', 'currentLevel', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -494,12 +677,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={levels}
                 value={form.learning.targetLevel}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learning: { ...prev.learning, targetLevel: val },
-                  }))
-                }
+                onChange={(val) => updateField('learning', 'targetLevel', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -508,17 +686,12 @@ export function LearnerQuestionnairePage() {
             <QuestionCard
               questionId="Q7"
               title="Mục tiêu cụ thể bạn muốn đạt được là gì?"
-              subtitle="Ví dụ: Đạt IELTS 7.0, Làm được website bán hàng bằng React, Đạt điểm 9 môn Toán thi đại học..."
+              subtitle="Ví dụ: Đạt IELTS 7.0, Làm được website bán hàng bằng React, Đạt điểm 9 môn Toán thi đại học... (Không bắt buộc)"
             >
               <Input
                 placeholder="Nhập mục tiêu cụ thể của bạn (tối đa 500 ký tự)..."
                 value={form.learning.goalText}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learning: { ...prev.learning, goalText: e.target.value },
-                  }))
-                }
+                onChange={(e) => updateField('learning', 'goalText', e.target.value)}
                 maxLength={500}
               />
             </QuestionCard>
@@ -534,12 +707,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={targetDurationOptions}
                 value={form.learning.targetDuration}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learning: { ...prev.learning, targetDuration: val },
-                  }))
-                }
+                onChange={(val) => updateField('learning', 'targetDuration', val)}
                 columns={3}
               />
             </QuestionCard>
@@ -551,7 +719,7 @@ export function LearnerQuestionnairePage() {
           <div className="space-y-5 animate-fadeIn">
             <div className="p-4 bg-brand-50/40 border border-brand-100 rounded-2xl">
               <h2 className="text-sm font-bold text-brand-900">
-                Phần 2: Phương pháp & Phong cách học tập
+                Phần 2: Phương pháp & Phong cách học tập (Q9 – Q14)
               </h2>
               <p className="text-xs text-brand-700/80 mt-0.5">
                 Giúp gia sư cá nhân hóa giáo trình và phương thức truyền đạt phù hợp nhất.
@@ -569,12 +737,7 @@ export function LearnerQuestionnairePage() {
               <MultipleChoiceField
                 options={teachingMethods}
                 value={form.learningStyle.methods}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learningStyle: { ...prev.learningStyle, methods: val },
-                  }))
-                }
+                onChange={(val) => updateField('learningStyle', 'methods', val)}
               />
             </QuestionCard>
 
@@ -589,12 +752,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={paceOptions}
                 value={form.learningStyle.pace}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learningStyle: { ...prev.learningStyle, pace: val },
-                  }))
-                }
+                onChange={(val) => updateField('learningStyle', 'pace', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -610,12 +768,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={classFormatOptions}
                 value={form.learningStyle.classFormat}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learningStyle: { ...prev.learningStyle, classFormat: val },
-                  }))
-                }
+                onChange={(val) => updateField('learningStyle', 'classFormat', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -632,12 +785,7 @@ export function LearnerQuestionnairePage() {
                 options={teachingStyles}
                 value={form.learningStyle.preferredTutorStyles}
                 maxSelections={3}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learningStyle: { ...prev.learningStyle, preferredTutorStyles: val },
-                  }))
-                }
+                onChange={(val) => updateField('learningStyle', 'preferredTutorStyles', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -653,12 +801,7 @@ export function LearnerQuestionnairePage() {
               <MultipleChoiceField
                 options={materials}
                 value={form.learningStyle.materials}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learningStyle: { ...prev.learningStyle, materials: val },
-                  }))
-                }
+                onChange={(val) => updateField('learningStyle', 'materials', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -674,12 +817,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={interactionLevels}
                 value={form.learningStyle.interactionLevel}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    learningStyle: { ...prev.learningStyle, interactionLevel: val },
-                  }))
-                }
+                onChange={(val) => updateField('learningStyle', 'interactionLevel', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -691,7 +829,7 @@ export function LearnerQuestionnairePage() {
           <div className="space-y-5 animate-fadeIn">
             <div className="p-4 bg-brand-50/40 border border-brand-100 rounded-2xl">
               <h2 className="text-sm font-bold text-brand-900">
-                Phần 3: Thời gian học tập
+                Phần 3: Thời gian học tập (Q15 – Q18)
               </h2>
               <p className="text-xs text-brand-700/80 mt-0.5">
                 Khung giờ và thời lượng học tập mong muốn (lưu ý: chỉ là preference, lịch học chính thức sẽ chọn theo slot rảnh của gia sư).
@@ -709,12 +847,7 @@ export function LearnerQuestionnairePage() {
               <MultipleChoiceField
                 options={timeBands}
                 value={form.schedulePreferences.timeBands}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    schedulePreferences: { ...prev.schedulePreferences, timeBands: val },
-                  }))
-                }
+                onChange={(val) => updateField('schedulePreferences', 'timeBands', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -730,12 +863,7 @@ export function LearnerQuestionnairePage() {
               <MultipleChoiceField
                 options={weekdayOptions}
                 value={form.schedulePreferences.weekdays}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    schedulePreferences: { ...prev.schedulePreferences, weekdays: val },
-                  }))
-                }
+                onChange={(val) => updateField('schedulePreferences', 'weekdays', val)}
                 columns={4}
               />
             </QuestionCard>
@@ -751,12 +879,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={sessionsPerWeekOptions}
                 value={form.schedulePreferences.sessionsPerWeek}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    schedulePreferences: { ...prev.schedulePreferences, sessionsPerWeek: val },
-                  }))
-                }
+                onChange={(val) => updateField('schedulePreferences', 'sessionsPerWeek', val)}
                 columns={3}
               />
             </QuestionCard>
@@ -772,12 +895,7 @@ export function LearnerQuestionnairePage() {
               <MultipleChoiceField
                 options={durationMinutesOptions}
                 value={form.schedulePreferences.durationMinutes}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    schedulePreferences: { ...prev.schedulePreferences, durationMinutes: val },
-                  }))
-                }
+                onChange={(val) => updateField('schedulePreferences', 'durationMinutes', val)}
                 columns={3}
               />
             </QuestionCard>
@@ -789,7 +907,7 @@ export function LearnerQuestionnairePage() {
           <div className="space-y-5 animate-fadeIn">
             <div className="p-4 bg-brand-50/40 border border-brand-100 rounded-2xl">
               <h2 className="text-sm font-bold text-brand-900">
-                Phần 4: Hình thức, địa điểm, ngân sách & Tiêu chuẩn Tutor
+                Phần 4: Hình thức, địa điểm, ngân sách & Tiêu chuẩn Tutor (Q19 – Q24)
               </h2>
               <p className="text-xs text-brand-700/80 mt-0.5">
                 Thiết lập kỳ vọng học phí, hình thức gặp mặt và các tiêu chí chuyên môn của gia sư.
@@ -807,12 +925,7 @@ export function LearnerQuestionnairePage() {
               <MultipleChoiceField
                 options={modes}
                 value={form.constraints.modes}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    constraints: { ...prev.constraints, modes: val },
-                  }))
-                }
+                onChange={(val) => updateField('constraints', 'modes', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -829,12 +942,7 @@ export function LearnerQuestionnairePage() {
                 <MultipleChoiceField
                   options={offlineLocations}
                   value={form.constraints.offlineLocations}
-                  onChange={(val) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      constraints: { ...prev.constraints, offlineLocations: val },
-                    }))
-                  }
+                  onChange={(val) => updateField('constraints', 'offlineLocations', val)}
                   columns={2}
                 />
               </QuestionCard>
@@ -858,12 +966,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={budgetRangeOptions}
                 value={form.constraints.budgetRangeId}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    constraints: { ...prev.constraints, budgetRangeId: val },
-                  }))
-                }
+                onChange={(val) => updateField('constraints', 'budgetRangeId', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -880,12 +983,7 @@ export function LearnerQuestionnairePage() {
                 options={priorities}
                 value={form.tutorRequirements.selectionPriorities}
                 maxSelections={3}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    tutorRequirements: { ...prev.tutorRequirements, selectionPriorities: val },
-                  }))
-                }
+                onChange={(val) => updateField('tutorRequirements', 'selectionPriorities', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -901,12 +999,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={experienceRangeOptions}
                 value={form.tutorRequirements.experienceRange}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    tutorRequirements: { ...prev.tutorRequirements, experienceRange: val },
-                  }))
-                }
+                onChange={(val) => updateField('tutorRequirements', 'experienceRange', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -922,12 +1015,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={certificateRequirementOptions}
                 value={form.tutorRequirements.certificateRequirement}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    tutorRequirements: { ...prev.tutorRequirements, certificateRequirement: val },
-                  }))
-                }
+                onChange={(val) => updateField('tutorRequirements', 'certificateRequirement', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -939,7 +1027,7 @@ export function LearnerQuestionnairePage() {
           <div className="space-y-5 animate-fadeIn">
             <div className="p-4 bg-brand-50/40 border border-brand-100 rounded-2xl">
               <h2 className="text-sm font-bold text-brand-900">
-                Phần 5: Khó khăn, hỗ trợ & Cá nhân hóa
+                Phần 5: Khó khăn, hỗ trợ & Cá nhân hóa (Q25 – Q28)
               </h2>
               <p className="text-xs text-brand-700/80 mt-0.5">
                 Chia sẻ những khúc mắc và sự hỗ trợ bạn cần nhất để gia sư chuẩn bị tốt nhất.
@@ -957,12 +1045,7 @@ export function LearnerQuestionnairePage() {
               <MultipleChoiceField
                 options={difficulties}
                 value={form.supportNeeds.difficulties}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    supportNeeds: { ...prev.supportNeeds, difficulties: val },
-                  }))
-                }
+                onChange={(val) => updateField('supportNeeds', 'difficulties', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -978,12 +1061,7 @@ export function LearnerQuestionnairePage() {
               <MultipleChoiceField
                 options={supportTypes}
                 value={form.supportNeeds.desiredSupport}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    supportNeeds: { ...prev.supportNeeds, desiredSupport: val },
-                  }))
-                }
+                onChange={(val) => updateField('supportNeeds', 'desiredSupport', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -999,12 +1077,7 @@ export function LearnerQuestionnairePage() {
               <SingleChoiceField
                 options={progressTracking}
                 value={form.supportNeeds.progressTracking}
-                onChange={(val) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    supportNeeds: { ...prev.supportNeeds, progressTracking: val },
-                  }))
-                }
+                onChange={(val) => updateField('supportNeeds', 'progressTracking', val)}
                 columns={2}
               />
             </QuestionCard>
@@ -1013,22 +1086,56 @@ export function LearnerQuestionnairePage() {
             <QuestionCard
               questionId="Q28"
               title="Hãy chia sẻ thêm điều bạn mong muốn ở Tutor (nếu có)"
-              subtitle="Ghi chú văn bản tự do giúp gia sư thấu hiểu mong đợi và thói quen học tập của bạn hơn"
+              subtitle="Ghi chú văn bản tự do giúp gia sư thấu hiểu mong đợi và thói quen học tập của bạn hơn (Không bắt buộc)"
             >
               <Textarea
                 placeholder="Ví dụ: Mình khá nhút nhát nên mong gia sư kiên nhẫn; Mình cần học nhanh để kịp thi chứng chỉ vào tháng sau..."
                 rows={4}
                 value={form.additionalNote}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    additionalNote: e.target.value,
-                  }))
-                }
+                onChange={(e) => updateAdditionalNote(e.target.value)}
                 maxLength={1000}
               />
             </QuestionCard>
           </div>
+        )}
+
+        {/* ================= SECTION 6: Xác nhận & Kiểm tra thông tin (Review Step) ================= */}
+        {currentSectionIndex === 5 && (
+          <QuestionnaireReviewSummary
+            form={form}
+            optionsData={{
+              categories,
+              purposes,
+              levels,
+              targetDurationOptions,
+              teachingMethods,
+              paceOptions,
+              classFormatOptions,
+              teachingStyles,
+              materials,
+              interactionLevels,
+              timeBands,
+              weekdayOptions,
+              sessionsPerWeekOptions,
+              durationMinutesOptions,
+              modes,
+              offlineLocations,
+              budgetRangeOptions,
+              priorities,
+              experienceRangeOptions,
+              certificateRequirementOptions,
+              difficulties,
+              supportTypes,
+              progressTracking,
+            }}
+            isOfflineSelected={isOfflineSelected}
+            onEditSection={(idx) => {
+              setCurrentSectionIndex(idx);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            missingQuestions={missingQuestions}
+            isAllValid={isAllValid}
+          />
         )}
       </div>
 
@@ -1036,19 +1143,15 @@ export function LearnerQuestionnairePage() {
       <QuestionnaireActions
         currentSectionIndex={currentSectionIndex}
         totalSections={sections.length}
-        onPrevious={() => {
-          setCurrentSectionIndex((prev) => Math.max(0, prev - 1));
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onNext={() => {
-          setCurrentSectionIndex((prev) => Math.min(sections.length - 1, prev + 1));
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
+        onPrevious={handlePrevious}
+        onNext={handleNext}
         onSaveDraft={handleSaveDraft}
         onSubmit={handleSubmit}
         isSavingDraft={isSavingDraft}
         isSubmitting={isSubmitting}
-        submitLabel="Hoàn tất khảo sát nhu cầu"
+        submitLabel="Hoàn thành khảo sát"
+        nextLabel="Tiếp theo"
+        prevLabel="Câu trước"
       />
     </div>
   );

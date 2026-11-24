@@ -7,14 +7,16 @@ import Button from '../../../components/common/Button';
  */
 export function QuestionnaireActions({
   currentSectionIndex = 0,
-  totalSections = 5,
+  totalSections = 6,
   onPrevious,
   onNext,
   onSaveDraft,
   onSubmit,
   isSavingDraft = false,
   isSubmitting = false,
-  submitLabel = 'Hoàn tất khảo sát',
+  submitLabel = 'Hoàn thành khảo sát',
+  nextLabel = 'Tiếp theo',
+  prevLabel = 'Câu trước',
 }) {
   const isFirstStep = currentSectionIndex === 0;
   const isLastStep = currentSectionIndex === totalSections - 1;
@@ -32,7 +34,7 @@ export function QuestionnaireActions({
           iconLeft={ArrowLeft}
           className="w-full sm:w-auto"
         >
-          Phần trước
+          {prevLabel}
         </Button>
       </div>
 
@@ -48,7 +50,7 @@ export function QuestionnaireActions({
           iconLeft={Save}
           className="w-full sm:w-auto"
         >
-          Lưu nháp tiến độ
+          Lưu tạm câu trả lời
         </Button>
       </div>
 
@@ -63,7 +65,7 @@ export function QuestionnaireActions({
             disabled={isSavingDraft}
             onClick={onSubmit}
             iconRight={CheckCircle2}
-            className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 shadow-md shadow-brand-500/20"
+            className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white shadow-md shadow-brand-500/20"
           >
             {submitLabel}
           </Button>
@@ -75,9 +77,9 @@ export function QuestionnaireActions({
             disabled={isSavingDraft || isSubmitting}
             onClick={onNext}
             iconRight={ArrowRight}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white"
           >
-            Tiếp tục phần sau
+            {nextLabel}
           </Button>
         )}
       </div>
