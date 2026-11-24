@@ -138,11 +138,11 @@ Không dùng chung một badge/status mapping cho AvailabilitySlot, Booking, Tut
 Mục tiêu: Tạo ứng dụng React có cấu trúc rõ ràng, có thể phát triển đồng thời các feature và tích hợp API theo một quy ước chung.
 Công việc thực hiện
 1. Khởi tạo React + Vite và thiết lập script chạy local/build.
-2. Cài đặt React Router, Axios hoặc Fetch API, thư viện state nếu cần và bộ UI/icon.
+2. Cài đặt React Router, Axios hoặc Fetch API,thiết lập thông báo bằng toast, thư viện state nếu cần và bộ UI/icon của luside.
 3. Thiết lập cấu trúc thư mục theo feature, components, layouts, hooks, services, utils, assets và routes.
 4. Tạo layout chung: Header, Sidebar/Dashboard layout, Footer, Toast, Modal và trang lỗi.
 5. Thiết lập VITE_API_BASE_URL và API client dùng chung.
-6. Xây dựng design system cơ bản: màu sắc, typography, spacing, button, input, form, bảng, card và trạng thái.
+6. Xây dựng design system cơ bản: màu sắc, typography, spacing, button, input, form, bảng, card và trạng thái.(tailwind)
 7. Tạo component trạng thái loading/error/empty/success và component xác nhận hành động.
 8. Thiết lập responsive cơ bản cho desktop, tablet và mobile.
 Đầu ra
