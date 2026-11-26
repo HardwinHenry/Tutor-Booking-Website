@@ -87,11 +87,6 @@ export function Footer() {
             </h4>
             <ul className="space-y-2 text-xs text-slate-600">
               <li>
-                <Link to="/design-system" className="hover:text-brand-600 transition-colors">
-                  Design System Showcase
-                </Link>
-              </li>
-              <li>
                 <Link to="/admin/dashboard" className="hover:text-brand-600 transition-colors">
                   Khu vực Quản trị (Admin)
                 </Link>

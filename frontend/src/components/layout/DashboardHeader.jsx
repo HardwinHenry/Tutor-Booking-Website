@@ -3,6 +3,7 @@ import { Menu, Bell } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import Breadcrumb from './Breadcrumb';
 import Badge from '../common/Badge';
+import { toast } from '../feedback/ToastProvider';
 
 export function DashboardHeader({ onMenuClick, breadcrumbs = [], title }) {
   const { user } = useAuthStore();
@@ -29,10 +30,12 @@ export function DashboardHeader({ onMenuClick, breadcrumbs = [], title }) {
         <button
           type="button"
           aria-label="Thông báo"
+          onClick={() =>
+            toast.info('Tính năng Notification Center đang chờ tích hợp API thông báo từ Backend.')
+          }
           className="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
         >
           <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-brand-500 ring-2 ring-white" />
         </button>
 
         {/* User Role Pill */}

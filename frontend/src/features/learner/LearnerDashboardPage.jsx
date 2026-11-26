@@ -16,30 +16,42 @@ import Badge from '../../components/common/Badge';
 import StatusBadge from '../../components/common/StatusBadge';
 import { useAuthStore } from '../../store/useAuthStore';
 import { learnerService } from '../../services/learner.service';
+import { bookingService } from '../../services/booking.service';
+import { formatDate, formatTime } from '../../utils/formatters';
 import { calculateLearnerProgress, mapBackendToLearnerForm } from '../questionnaire/utils/learnerFormMapper';
 
 export function LearnerDashboardPage() {
   const navigate = useNavigate();
   const { user, setSurveyStatus } = useAuthStore();
   const [preference, setPreference] = useState(null);
+  const [bookings, setBookings] = useState([]);
+  const [upcomingCount, setUpcomingCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    learnerService
-      .getMyPreference(true)
-      .then((data) => {
-        if (isMounted) {
-          setPreference(data);
-          const status = data?.completionStatus || 'not_started';
-          setSurveyStatus(status);
-          if (status !== 'completed') {
-            navigate('/learner/questionnaire', { replace: true });
-          }
+    Promise.all([
+      learnerService.getMyPreference(true),
+      bookingService.getMyBookings({ limit: 5, sortBy: 'startAt', order: 'desc' }).catch(() => null),
+      bookingService.getMyBookings({ status: 'confirmed', limit: 1 }).catch(() => null),
+      bookingService.getMyBookings({ status: 'pending', limit: 1 }).catch(() => null),
+    ])
+      .then(([prefData, recentBookings, confirmedRes, pendingRes]) => {
+        if (!isMounted) return;
+        setPreference(prefData);
+        const status = prefData?.completionStatus || 'not_started';
+        setSurveyStatus(status);
+        if (status !== 'completed') {
+          navigate('/learner/questionnaire', { replace: true });
+          return;
         }
+        setBookings(recentBookings?.items || []);
+        setUpcomingCount(confirmedRes?.pagination?.total || 0);
+        setPendingCount(pendingRes?.pagination?.total || 0);
       })
       .catch((err) => {
-        console.error('Không thể tải nhu cầu học tập:', err);
+        console.error('Không thể tải dữ liệu học viên:', err);
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
@@ -112,8 +124,8 @@ export function LearnerDashboardPage() {
               <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-medium text-slate-500">Buổi học sắp tới</p>
-              <p className="text-sm font-bold text-slate-800">0 buổi</p>
+              <p className="text-[11px] font-medium text-slate-500">Buổi học đã xác nhận</p>
+              <p className="text-sm font-bold text-slate-800">{upcomingCount} buổi</p>
             </div>
           </div>
         </Card>
@@ -125,7 +137,7 @@ export function LearnerDashboardPage() {
             </div>
             <div>
               <p className="text-[11px] font-medium text-slate-500">Yêu cầu chờ duyệt</p>
-              <p className="text-sm font-bold text-slate-800">0 yêu cầu</p>
+              <p className="text-sm font-bold text-slate-800">{pendingCount} yêu cầu</p>
             </div>
           </div>
         </Card>
@@ -228,11 +240,39 @@ export function LearnerDashboardPage() {
             </div>
           </Card>
 
-          {/* Bookings placeholder */}
-          <Card title="Buổi học gần đây" subtitle="Quản lý lịch học và trạng thái booking">
-            <div className="py-8 text-center text-slate-400 text-xs">
-              Chưa có lịch học nào. Sau khi hoàn thành khảo sát, bạn có thể tìm kiếm và chọn khung giờ rảnh của gia sư.
-            </div>
+          {/* Bookings list */}
+          <Card
+            title="Buổi học gần đây"
+            subtitle="Quản lý lịch học và trạng thái booking"
+            action={
+              <Link to="/learner/bookings">
+                <Button variant="outline" size="sm" iconRight={ArrowRight}>
+                  Xem tất cả
+                </Button>
+              </Link>
+            }
+          >
+            {bookings.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                Chưa có lịch học nào. Bạn có thể tìm kiếm hoặc xem gợi ý gia sư để đặt khung giờ rảnh.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {bookings.map((b) => (
+                  <div key={b._id} className="py-3 flex items-center justify-between gap-3 text-xs">
+                    <div>
+                      <p className="font-bold text-slate-800">
+                        {b.tutorId?.name || 'Gia sư'} — {b.subjectName || 'Buổi học'}
+                      </p>
+                      <p className="text-slate-500 mt-0.5">
+                        {formatDate(b.startAt)} • {formatTime(b.startAt)} – {formatTime(b.endAt)}
+                      </p>
+                    </div>
+                    <StatusBadge type="booking" status={b.status} />
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
 

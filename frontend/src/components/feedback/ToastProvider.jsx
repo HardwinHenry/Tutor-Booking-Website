@@ -40,5 +40,21 @@ export function ToastProvider() {
   );
 }
 
-export const toast = hotToast;
+export const toast = Object.assign(hotToast, {
+  info: (message, options = {}) =>
+    hotToast(message, {
+      icon: 'ℹ️',
+      ...options,
+    }),
+  warning: (message, options = {}) =>
+    hotToast(message, {
+      icon: '⚠️',
+      ...options,
+    }),
+  warn: (message, options = {}) =>
+    hotToast(message, {
+      icon: '⚠️',
+      ...options,
+    }),
+});
 export default ToastProvider;

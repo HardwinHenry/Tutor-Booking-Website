@@ -16,19 +16,36 @@ import Badge from '../../components/common/Badge';
 import StatusBadge from '../../components/common/StatusBadge';
 import { useAuthStore } from '../../store/useAuthStore';
 import { tutorService } from '../../services/tutor.service';
+import { availabilityService } from '../../services/availability.service';
+import { bookingService } from '../../services/booking.service';
+import { calendarService } from '../../services/calendar.service';
+import { formatDate, formatTime } from '../../utils/formatters';
 import { calculateTutorProgress, mapBackendToTutorForm } from '../questionnaire/utils/tutorFormMapper';
 
 export function TutorDashboardPage() {
   const { user } = useAuthStore();
   const [profile, setProfile] = useState(null);
+  const [availableSlotsCount, setAvailableSlotsCount] = useState(0);
+  const [pendingBookings, setPendingBookings] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [calendarConnected, setCalendarConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    tutorService
-      .getMyProfile(true)
-      .then((data) => {
-        if (isMounted) setProfile(data);
+    Promise.all([
+      tutorService.getMyProfile(true),
+      availabilityService.getMySlots({ status: 'available', limit: 1 }).catch(() => null),
+      bookingService.getMyBookings({ status: 'pending', limit: 5, sortBy: 'startAt', order: 'asc' }).catch(() => null),
+      calendarService.getStatus().catch(() => null),
+    ])
+      .then(([profData, availRes, pendingRes, calRes]) => {
+        if (!isMounted) return;
+        setProfile(profData);
+        setAvailableSlotsCount(availRes?.pagination?.total || 0);
+        setPendingBookings(pendingRes?.items || []);
+        setPendingCount(pendingRes?.pagination?.total || 0);
+        setCalendarConnected(Boolean(calRes?.connected));
       })
       .catch((err) => {
         console.error('Không thể tải thông tin gia sư:', err);
@@ -178,7 +195,7 @@ export function TutorDashboardPage() {
             </div>
             <div>
               <p className="text-[11px] font-medium text-slate-500">Khung giờ rảnh mở</p>
-              <p className="text-sm font-bold text-slate-800">0 slot</p>
+              <p className="text-sm font-bold text-slate-800">{availableSlotsCount} slot</p>
             </div>
           </div>
         </Card>
@@ -190,7 +207,7 @@ export function TutorDashboardPage() {
             </div>
             <div>
               <p className="text-[11px] font-medium text-slate-500">Yêu cầu booking mới</p>
-              <p className="text-sm font-bold text-slate-800">0 yêu cầu</p>
+              <p className="text-sm font-bold text-slate-800">{pendingCount} yêu cầu</p>
             </div>
           </div>
         </Card>
@@ -202,7 +219,10 @@ export function TutorDashboardPage() {
             </div>
             <div>
               <p className="text-[11px] font-medium text-slate-500">Google Calendar</p>
-              <StatusBadge type="calendarSync" status="skipped" />
+              <StatusBadge
+                type="calendarSync"
+                status={calendarConnected ? 'synced' : 'not_connected'}
+              />
             </div>
           </div>
         </Card>
@@ -214,10 +234,35 @@ export function TutorDashboardPage() {
           <Card
             title="Yêu cầu đặt lịch chờ phản hồi"
             subtitle="Xác nhận hoặc từ chối booking từ học viên theo chính sách"
+            action={
+              <Link to="/tutor/bookings">
+                <Button variant="outline" size="sm" iconRight={ArrowRight}>
+                  Xử lý ngay
+                </Button>
+              </Link>
+            }
           >
-            <div className="py-8 text-center text-slate-400 text-xs">
-              Chưa có yêu cầu đặt lịch nào đang chờ xác nhận.
-            </div>
+            {pendingBookings.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                Chưa có yêu cầu đặt lịch nào đang chờ xác nhận.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {pendingBookings.map((b) => (
+                  <div key={b._id} className="py-3 flex items-center justify-between gap-3 text-xs">
+                    <div>
+                      <p className="font-bold text-slate-800">
+                        {b.learnerId?.name || 'Học viên'} — {b.subjectName || 'Buổi học'}
+                      </p>
+                      <p className="text-slate-500 mt-0.5">
+                        {formatDate(b.startAt)} • {formatTime(b.startAt)} – {formatTime(b.endAt)}
+                      </p>
+                    </div>
+                    <StatusBadge type="booking" status={b.status} />
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
           {/* Profile overview if data exists */}

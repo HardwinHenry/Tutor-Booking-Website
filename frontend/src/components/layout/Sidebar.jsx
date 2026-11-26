@@ -51,6 +51,8 @@ export function Sidebar({ isOpen, onClose }) {
             { to: '/admin/users', label: 'Quản lý người dùng', icon: Users },
             { to: '/admin/taxonomies', label: 'Quản lý Taxonomy & Tag', icon: Tag },
             { to: '/admin/bookings', label: 'Tra cứu Booking', icon: CalendarDays },
+            { to: '/admin/reviews', label: 'Kiểm duyệt Đánh giá', icon: Star },
+            { to: '/admin/calendar-sync', label: 'Giám sát Calendar Sync', icon: Calendar },
           ],
         },
       ];
@@ -62,7 +64,8 @@ export function Sidebar({ isOpen, onClose }) {
           title: 'Khu vực Gia sư',
           items: [
             { to: '/tutor/dashboard', label: 'Bàn làm việc Gia sư', icon: LayoutDashboard },
-            { to: '/tutor/questionnaire', label: 'Hồ sơ năng lực (28 mục)', icon: ClipboardList },
+            { to: '/tutor/profile', label: 'Hồ sơ giảng dạy', icon: ShieldCheck },
+            { to: '/tutor/questionnaire', label: 'Khảo sát năng lực (28 mục)', icon: ClipboardList },
           ],
         },
         {
