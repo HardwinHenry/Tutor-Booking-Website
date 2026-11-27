@@ -12,7 +12,7 @@ export const taxonomyService = {
    */
   async getTaxonomies(params = {}) {
     const response = await apiClient.get('/taxonomies', { params });
-    return response.data?.taxonomies || [];
+    return response.data?.items || response.data?.taxonomies || [];
   },
 
   /**
@@ -33,7 +33,7 @@ export const taxonomyService = {
    */
   async getTaxonomyById(id) {
     const response = await apiClient.get(`/taxonomies/${id}`);
-    return response.data?.taxonomy;
+    return response.data?.item || response.data?.taxonomy;
   },
 
   /**
@@ -43,7 +43,7 @@ export const taxonomyService = {
    */
   async getTags(params = {}) {
     const response = await apiClient.get('/tags', { params });
-    return response.data?.tags || [];
+    return response.data?.items || response.data?.tags || [];
   },
 };
 

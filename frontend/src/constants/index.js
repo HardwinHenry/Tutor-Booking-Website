@@ -18,11 +18,11 @@ export const STORAGE_KEYS = {
   SURVEY_STATUS: 'tc_survey_status',
 };
 
-// Vòng đời AvailabilitySlot (Tutor)
+// Vòng đời AvailabilitySlot (Tutor) - đồng bộ backend availabilityStatus.js
 export const AVAILABILITY_STATUS = {
   AVAILABLE: 'available',
-  RESERVED: 'reserved',
-  CANCELLED: 'cancelled',
+  BOOKED: 'booked',
+  CLOSED: 'closed',
 };
 
 // Vòng đời Booking
@@ -49,9 +49,41 @@ export const ONBOARDING_STATUS = {
   COMPLETED: 'completed',
 };
 
-// Trạng thái đồng bộ Google Calendar
+// Trạng thái đồng bộ Google Calendar - đồng bộ backend calendarStatus.js
 export const CALENDAR_SYNC_STATUS = {
+  NOT_CONNECTED: 'not_connected',
+  PENDING: 'pending',
   SYNCED: 'synced',
   FAILED: 'failed',
-  SKIPPED: 'skipped',
+  CANCELLED: 'cancelled',
 };
+
+// Trạng thái tài khoản User - đồng bộ backend userStatus.js
+export const USER_STATUS = {
+  ACTIVE: 'active',
+  LOCKED: 'locked',
+  DISABLED: 'disabled',
+};
+
+// Loại Taxonomy dùng chung
+export const TAXONOMY_TYPES = [
+  { value: 'category', label: 'Lĩnh vực (Category)' },
+  { value: 'subject', label: 'Môn học (Subject)' },
+  { value: 'topic', label: 'Chuyên môn (Topic)' },
+  { value: 'level', label: 'Cấp độ (Level)' },
+  { value: 'learning_purpose', label: 'Mục đích học' },
+  { value: 'teaching_method', label: 'Phương pháp dạy' },
+  { value: 'teaching_style', label: 'Phong cách gia sư' },
+  { value: 'learning_material', label: 'Tài liệu học tập' },
+  { value: 'interaction_level', label: 'Mức độ tương tác' },
+  { value: 'time_band', label: 'Khung giờ trong ngày' },
+  { value: 'learning_mode', label: 'Hình thức học' },
+  { value: 'offline_location', label: 'Địa điểm Offline' },
+  { value: 'support_type', label: 'Hoạt động hỗ trợ' },
+  { value: 'learning_difficulty', label: 'Khó khăn học viên' },
+  { value: 'support_approach', label: 'Cách xử lý khó khăn' },
+  { value: 'progress_tracking', label: 'Theo dõi tiến độ' },
+  { value: 'selection_priority', label: 'Tiêu chí ưu tiên' },
+  { value: 'certificate_type', label: 'Loại chứng chỉ' },
+  { value: 'tag', label: 'Tag chung' },
+];

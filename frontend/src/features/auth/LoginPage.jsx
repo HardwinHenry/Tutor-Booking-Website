@@ -105,9 +105,6 @@ export function LoginPage() {
             <input type="checkbox" className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
             <span>Ghi nhớ phiên</span>
           </label>
-          <a href="#forgot" className="font-semibold text-brand-600 hover:text-brand-700">
-            Quên mật khẩu?
-          </a>
         </div>
 
         <Button

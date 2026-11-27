@@ -37,8 +37,21 @@ export const tutorService = {
   },
 
   /**
+   * Public search for approved tutors
+   * @param {object} [params]
+   * @returns {Promise<{ items: Array, pagination: object }>}
+   */
+  async searchTutors(params = {}) {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await apiClient.get('/tutors', { params: cleanParams });
+    return response.data;
+  },
+
+  /**
    * Get public profile of a tutor
-   * @param {string} tutorId
+   * @param {string} tutorId - TutorProfile ID or User ID
    * @returns {Promise<object>}
    */
   async getPublicProfile(tutorId) {

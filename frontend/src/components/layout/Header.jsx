@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   GraduationCap,
   Menu,
@@ -8,7 +8,6 @@ import {
   LogOut,
   LayoutDashboard,
   Search,
-  BookOpen,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import Button from '../common/Button';
@@ -19,8 +18,10 @@ export function Header() {
   const { user, isAuthenticated, logout, isLearner, isTutor, isAdmin, surveyStatus } =
     useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const isSurveyPending = isLearner() && surveyStatus !== 'completed';
+  const isTutorsPage = location.pathname === '/tutors';
 
   const handleLogout = async () => {
     await logout();
@@ -55,7 +56,7 @@ export function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          {!isSurveyPending && (
+          {!isSurveyPending && !isTutorsPage && (
             <nav className="hidden md:flex items-center space-x-8">
               <Link
                 to="/tutors"
@@ -63,13 +64,6 @@ export function Header() {
               >
                 <Search className="w-4 h-4" />
                 <span>Tìm gia sư</span>
-              </Link>
-              <Link
-                to="/design-system"
-                className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors flex items-center gap-1.5"
-              >
-                <BookOpen className="w-4 h-4" />
-                <span>Design System</span>
               </Link>
             </nav>
           )}
@@ -141,20 +135,15 @@ export function Header() {
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden border-b border-slate-200 bg-white px-4 pt-2 pb-4 space-y-3">
-          <Link
-            to="/tutors"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2 rounded-lg text-base font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Tìm gia sư
-          </Link>
-          <Link
-            to="/design-system"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2 rounded-lg text-base font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Design System
-          </Link>
+          {!isSurveyPending && !isTutorsPage && (
+            <Link
+              to="/tutors"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-lg text-base font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Tìm gia sư
+            </Link>
+          )}
           <div className="pt-3 border-t border-slate-100">
             {isAuthenticated ? (
               <div className="space-y-2">
