@@ -415,6 +415,25 @@ export function LearnerQuestionnairePage() {
     }
 
     setErrors(errs);
+    const firstKey = Object.keys(errs)[0] || null;
+    if (firstKey) {
+      const qMap = {
+        categoryId: 'Q1', subjectIds: 'Q2', topicIds: 'Q3', purposes: 'Q4',
+        currentLevel: 'Q5', targetLevel: 'Q6', targetDuration: 'Q8',
+        methods: 'Q9', pace: 'Q10', classFormat: 'Q11', preferredTutorStyles: 'Q12',
+        materials: 'Q13', interactionLevel: 'Q14',
+        timeBands: 'Q15', weekdays: 'Q16', sessionsPerWeek: 'Q17', durationMinutes: 'Q18',
+        modes: 'Q19', offlineLocations: 'Q20', budgetRangeId: 'Q21',
+        selectionPriorities: 'Q22', experienceRange: 'Q23', certificateRequirement: 'Q24',
+        difficulties: 'Q25', desiredSupport: 'Q26', progressTracking: 'Q27',
+      };
+      const qId = qMap[firstKey];
+      if (qId) {
+        setTimeout(() => {
+          document.getElementById(`question-${qId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 60);
+      }
+    }
     return Object.keys(errs).length === 0;
   };
 

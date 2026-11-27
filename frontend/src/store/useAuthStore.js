@@ -3,6 +3,7 @@ import { STORAGE_KEYS, ROLES } from '../constants';
 import { storage } from '../utils/storage';
 import authService from '../services/auth.service';
 import learnerService from '../services/learner.service';
+import apiClient from '../services/apiClient';
 
 /**
  * Global Authentication Store with Zustand
@@ -12,6 +13,7 @@ export const useAuthStore = create((set, get) => {
   if (typeof window !== 'undefined') {
     window.addEventListener('auth:expired', () => {
       storage.remove(STORAGE_KEYS.SURVEY_STATUS);
+      delete apiClient.defaults.headers.common.Authorization;
       set({
         user: null,
         accessToken: null,
@@ -49,7 +51,10 @@ export const useAuthStore = create((set, get) => {
      */
     setSession: ({ user, accessToken, refreshToken }) => {
       storage.set(STORAGE_KEYS.USER, user);
-      if (accessToken) storage.set(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+      if (accessToken) {
+        storage.set(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+        apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+      }
       if (refreshToken) storage.set(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
 
       set({
@@ -182,6 +187,7 @@ export const useAuthStore = create((set, get) => {
         storage.remove(STORAGE_KEYS.REFRESH_TOKEN);
         storage.remove(STORAGE_KEYS.USER);
         storage.remove(STORAGE_KEYS.SURVEY_STATUS);
+        delete apiClient.defaults.headers.common.Authorization;
         set({
           user: null,
           accessToken: null,
