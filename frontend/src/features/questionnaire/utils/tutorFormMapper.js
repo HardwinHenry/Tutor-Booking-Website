@@ -27,8 +27,8 @@ export const getInitialTutorFormState = () => ({
   schedulePreferences: {
     timeBands: [],
     weekdays: [],
-    sessionsPerWeekRange: null,
-    durationMinutes: [],
+    maxSessionsPerWeek: null,
+    sessionDurationsMinutes: [],
   },
   // Nhóm 4: Hình thức & Học phí (Q19-Q22)
   teachingConditions: {
@@ -88,10 +88,15 @@ export const mapBackendToTutorForm = (profile) => {
       weekdays: Array.isArray(profile.schedulePreferences?.weekdays)
         ? profile.schedulePreferences.weekdays
         : [],
-      sessionsPerWeekRange: profile.schedulePreferences?.sessionsPerWeekRange || null,
-      durationMinutes: Array.isArray(profile.schedulePreferences?.durationMinutes)
-        ? profile.schedulePreferences.durationMinutes
-        : [],
+      maxSessionsPerWeek:
+        profile.schedulePreferences?.maxSessionsPerWeek ||
+        profile.schedulePreferences?.sessionsPerWeekRange ||
+        null,
+      sessionDurationsMinutes: Array.isArray(profile.schedulePreferences?.sessionDurationsMinutes)
+        ? profile.schedulePreferences.sessionDurationsMinutes
+        : Array.isArray(profile.schedulePreferences?.durationMinutes)
+          ? profile.schedulePreferences.durationMinutes
+          : [],
     },
     teachingConditions: {
       modes: getIds(profile.teachingConditions?.modes),
@@ -160,9 +165,9 @@ export const calculateTutorProgress = (form, requiresOffline = false) => {
   // Q16
   if (form.schedulePreferences.weekdays.length > 0) answered++;
   // Q17
-  if (form.schedulePreferences.sessionsPerWeekRange) answered++;
+  if (form.schedulePreferences.maxSessionsPerWeek) answered++;
   // Q18
-  if (form.schedulePreferences.durationMinutes.length > 0) answered++;
+  if (form.schedulePreferences.sessionDurationsMinutes.length > 0) answered++;
 
   // Q19
   if (form.teachingConditions.modes.length > 0) answered++;

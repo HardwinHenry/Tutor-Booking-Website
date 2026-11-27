@@ -246,8 +246,8 @@ export function TutorQuestionnairePage() {
       isCompleted:
         form.schedulePreferences.timeBands.length > 0 &&
         form.schedulePreferences.weekdays.length > 0 &&
-        !!form.schedulePreferences.sessionsPerWeekRange &&
-        form.schedulePreferences.durationMinutes.length > 0,
+        !!form.schedulePreferences.maxSessionsPerWeek &&
+        form.schedulePreferences.sessionDurationsMinutes.length > 0,
     },
     {
       id: 'conditions',
@@ -291,6 +291,46 @@ export function TutorQuestionnairePage() {
     }
   };
 
+  const FIELD_LOCATIONS = {
+    categoryId: { sectionIndex: 0, questionId: 'Q1' },
+    subjectIds: { sectionIndex: 0, questionId: 'Q2' },
+    topicIds: { sectionIndex: 0, questionId: 'Q3' },
+    supportedPurposes: { sectionIndex: 0, questionId: 'Q4' },
+    teachableLevels: { sectionIndex: 0, questionId: 'Q5' },
+    supportedTargetLevels: { sectionIndex: 0, questionId: 'Q6' },
+    supportedGoalTags: { sectionIndex: 0, questionId: 'Q7' },
+    estimatedDurationRanges: { sectionIndex: 0, questionId: 'Q8' },
+    methods: { sectionIndex: 1, questionId: 'Q9' },
+    pace: { sectionIndex: 1, questionId: 'Q10' },
+    classFormats: { sectionIndex: 1, questionId: 'Q11' },
+    styles: { sectionIndex: 1, questionId: 'Q12' },
+    materials: { sectionIndex: 1, questionId: 'Q13' },
+    interactionLevel: { sectionIndex: 1, questionId: 'Q14' },
+    timeBands: { sectionIndex: 2, questionId: 'Q15' },
+    weekdays: { sectionIndex: 2, questionId: 'Q16' },
+    maxSessionsPerWeek: { sectionIndex: 2, questionId: 'Q17' },
+    sessionDurationsMinutes: { sectionIndex: 2, questionId: 'Q18' },
+    modes: { sectionIndex: 3, questionId: 'Q19' },
+    offlineLocations: { sectionIndex: 3, questionId: 'Q20' },
+    priceRangeId: { sectionIndex: 3, questionId: 'Q22' },
+    experienceRange: { sectionIndex: 4, questionId: 'Q23' },
+    supportApproaches: { sectionIndex: 5, questionId: 'Q25' },
+    availableSupport: { sectionIndex: 5, questionId: 'Q26' },
+    assessmentMethods: { sectionIndex: 5, questionId: 'Q27' },
+  };
+
+  const scrollToQuestion = (fieldKey) => {
+    const loc = FIELD_LOCATIONS[fieldKey];
+    if (!loc) return;
+    setCurrentSectionIndex(loc.sectionIndex);
+    setTimeout(() => {
+      const el = document.getElementById(`question-${loc.questionId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 80);
+  };
+
   // Client validation before submit
   const validateForSubmit = () => {
     const errs = {};
@@ -326,8 +366,8 @@ export function TutorQuestionnairePage() {
     // Section 3
     if (!form.schedulePreferences.timeBands.length) errs.timeBands = 'Vui lòng chọn khung giờ bạn có thể dạy';
     if (!form.schedulePreferences.weekdays.length) errs.weekdays = 'Vui lòng chọn các ngày trong tuần';
-    if (!form.schedulePreferences.sessionsPerWeekRange) errs.sessionsPerWeekRange = 'Vui lòng chọn số buổi tối đa';
-    if (!form.schedulePreferences.durationMinutes.length) errs.durationMinutes = 'Vui lòng chọn thời lượng buổi dạy';
+    if (!form.schedulePreferences.maxSessionsPerWeek) errs.maxSessionsPerWeek = 'Vui lòng chọn số buổi tối đa';
+    if (!form.schedulePreferences.sessionDurationsMinutes.length) errs.sessionDurationsMinutes = 'Vui lòng chọn thời lượng buổi dạy';
 
     // Section 4
     if (!form.teachingConditions.modes.length) errs.modes = 'Vui lòng chọn hình thức giảng dạy';
@@ -345,13 +385,19 @@ export function TutorQuestionnairePage() {
     if (!form.assessmentMethods.length) errs.assessmentMethods = 'Vui lòng chọn phương thức đánh giá tiến độ';
 
     setErrors(errs);
-    return Object.keys(errs).length === 0;
+    const firstKey = Object.keys(errs)[0] || null;
+    return { isValid: !firstKey, firstKey, firstMessage: firstKey ? errs[firstKey] : null };
   };
 
   // Submit profile for Admin approval
   const handleSubmit = async () => {
-    if (!validateForSubmit()) {
-      toast.error('Vui lòng hoàn thành các trường bắt buộc trước khi nộp hồ sơ');
+    const { isValid, firstKey, firstMessage } = validateForSubmit();
+    if (!isValid && firstKey) {
+      const loc = FIELD_LOCATIONS[firstKey];
+      toast.error(
+        loc ? `Vui lòng bổ sung ${loc.questionId}: ${firstMessage}` : 'Vui lòng hoàn thành các trường bắt buộc trước khi nộp hồ sơ'
+      );
+      scrollToQuestion(firstKey);
       return;
     }
 
@@ -363,6 +409,12 @@ export function TutorQuestionnairePage() {
       toast.success('Nộp hồ sơ gia sư thành công! Hồ sơ đang chờ Quản trị viên duyệt.');
       navigate('/tutor/dashboard');
     } catch (err) {
+      const backendField = err?.errors?.[0]?.field;
+      const shortKey = backendField ? backendField.split('.').pop() : null;
+      if (shortKey && FIELD_LOCATIONS[shortKey]) {
+        setErrors((prev) => ({ ...prev, [shortKey]: err.errors[0].message }));
+        scrollToQuestion(shortKey);
+      }
       toast.error(err.message || 'Không thể nộp hồ sơ. Vui lòng kiểm tra lại thông tin.');
     } finally {
       setIsSubmitting(false);
@@ -814,15 +866,15 @@ export function TutorQuestionnairePage() {
               title="Bạn có thể nhận tối đa bao nhiêu buổi dạy mỗi tuần?"
               subtitle="Sức chứa tối đa để đảm bảo chất lượng bài giảng"
               required
-              error={errors.sessionsPerWeekRange}
+              error={errors.maxSessionsPerWeek}
             >
               <SingleChoiceField
                 options={tutorMaxSessionsOptions}
-                value={form.schedulePreferences.sessionsPerWeekRange}
+                value={form.schedulePreferences.maxSessionsPerWeek}
                 onChange={(val) =>
                   setForm((prev) => ({
                     ...prev,
-                    schedulePreferences: { ...prev.schedulePreferences, sessionsPerWeekRange: val },
+                    schedulePreferences: { ...prev.schedulePreferences, maxSessionsPerWeek: val },
                   }))
                 }
                 columns={3}
@@ -835,15 +887,15 @@ export function TutorQuestionnairePage() {
               title="Thời lượng mỗi buổi dạy bạn mong muốn là bao lâu?"
               subtitle="Thời lượng thiết kế bài giảng phù hợp với giáo án"
               required
-              error={errors.durationMinutes}
+              error={errors.sessionDurationsMinutes}
             >
               <MultipleChoiceField
                 options={sessionDurationsOptions}
-                value={form.schedulePreferences.durationMinutes}
+                value={form.schedulePreferences.sessionDurationsMinutes}
                 onChange={(val) =>
                   setForm((prev) => ({
                     ...prev,
-                    schedulePreferences: { ...prev.schedulePreferences, durationMinutes: val },
+                    schedulePreferences: { ...prev.schedulePreferences, sessionDurationsMinutes: val },
                   }))
                 }
                 columns={3}

@@ -36,8 +36,10 @@ const processQueue = (error, token = null) => {
 apiClient.interceptors.request.use(
   (config) => {
     const accessToken = storage.get(STORAGE_KEYS.ACCESS_TOKEN);
-    if (accessToken && !config.headers.Authorization) {
+    if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
+    } else if (config.headers.Authorization) {
+      delete config.headers.Authorization;
     }
     return config;
   },
